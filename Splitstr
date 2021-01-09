@@ -1,0 +1,49 @@
+void setup() {
+  Serial.begin(115200);
+  String* local_IP=constrip("(1)sdsdds,(2)rwrgf,(3)ff,(4)gggggggggg,(5)lll,(6)kkjug,(7)34r4f4r43", ",");
+  Serial.println(local_IP);
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+}
+
+String* Splitstr(String oldstr, String fgf) {
+  int pi = 0;
+  int fgfsl = 0;
+  int zfcd = oldstr.length();
+  while (pi >= 0) {
+    pi = oldstr.indexOf(fgf, pi + fgfsl);
+    if (pi > 0) {
+      fgfsl = fgfsl + 1;
+    }
+  }
+  int wz = 0;
+  int olddwz = 0;
+  int py_bwz = 0;
+  int py_ewz = 0;
+  pi = fgfsl + 1;
+  String *ok_str = new String[pi];
+  String temp_st;
+  for (int i = 0; i < pi; i++) {
+    wz = oldstr.indexOf(fgf, wz);
+    if (i == 0) {
+      py_bwz = 0;
+    } else {
+      py_bwz = olddwz + 1;
+    }
+    if (i == pi) {
+      py_ewz = zfcd;
+    } else {
+      py_ewz = wz - 1;
+    }
+    temp_st = oldstr.substring(py_bwz, py_ewz);
+    ok_str[i] = temp_st;
+    olddwz = wz;
+    if (wz > 0) {
+      wz = wz + 1;
+    }
+  }
+  return ok_str;
+}
