@@ -3,8 +3,8 @@
 IPAddress local_IP(192, 168, 8, 1);
 IPAddress gateway(192, 168, 8, 1);
 IPAddress subnet(255, 255, 255, 0);
-const char *ssid = "ESP_mzy001";
-const char *password = "ESP_mzyESPESP";
+const char *ssid = "谢谢谢谢";
+const char *password = "谢谢谢谢谢谢";
 ESP8266WebServer server(80);
 const int led = LED_BUILTIN;
 String comdata = "";
@@ -76,7 +76,7 @@ html{_padding:70px10px;}
 </div>
 <div class='main'><div style='width: 100%;height:100%;'>
 <iframe src=''  allowTransparency='true' style='width:98%;height:98%;padding: 0;border-width: 0;' height='100%' name='MF_01' id='MF_01'></iframe>
-</div></div><div class='bottom'><h1 class='ver-code'>阿盟税务局信息中心开发 v1.0</h1></div></body></html>)";
+</div></div><div class='bottom'><h1 class='ver-code'>谢谢谢谢 v1.0</h1></div></body></html>)";
 
 //=== ★★★★★★★  页面html_str 开始 ★★★★★★★ ===//
 
