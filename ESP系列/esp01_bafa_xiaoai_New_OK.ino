@@ -13,8 +13,10 @@ struct Config {
   char sleep_start[6] = "00:00";
   char sleep_end[6] = "22:00";
   uint8_t ap_timeout_minutes = 15;
-  uint8_t led_pin = 2;
+  uint8_t led_pin = 4;
   bool configured = false;
+  bool led_active_low = false; // LED极性：false=高电平有效，true=低电平有效
+  bool enable_sleep = true;    // 新增：是否启用休眠功能
 };
 
 Config config;
@@ -61,6 +63,7 @@ struct RTCData {
   uint8_t currentNtpIndex;
   unsigned long startupTime;
   bool timeEverSynced;
+  bool ledStateBeforeSleep;
 };
 
 RTCData rtcData;
@@ -104,8 +107,87 @@ void printNetworkInfo();
 bool validateTimeFormat(const char* timeStr);
 void printDebugInfo();
 String getFormattedTime();
+void setLedState(bool state);
+void safePinSetup();
+void testLedPolarity();
 
 // ********************* 函数实现 **********************
+
+// 安全的LED设置函数
+void setLedState(bool state) {
+  bool actualState = state;
+  
+  // 如果LED极性是低电平有效，则状态取反
+  if (config.led_active_low) {
+    actualState = !state;
+  }
+  
+  digitalWrite(currentLedPin, actualState ? HIGH : LOW);
+  rtcData.ledState = state; // 始终保存逻辑状态
+  
+  Serial.print("设置LED - 逻辑状态: ");
+  Serial.print(state ? "开" : "关");
+  Serial.print(", 物理电平: ");
+  Serial.print(actualState ? "高" : "低");
+  Serial.print(", 极性: ");
+  Serial.println(config.led_active_low ? "低有效" : "高有效");
+}
+
+// 安全引脚初始化
+void safePinSetup() {
+  // 先设置为输入模式，避免电平冲突
+  pinMode(currentLedPin, INPUT);
+  delay(10);
+  
+  // 然后设置为输出模式
+  pinMode(currentLedPin, OUTPUT);
+  
+  // 根据极性设置初始状态（关闭状态）
+  if (config.led_active_low) {
+    digitalWrite(currentLedPin, HIGH); // 低电平有效，初始设为高电平（关闭）
+  } else {
+    digitalWrite(currentLedPin, LOW);  // 高电平有效，初始设为低电平（关闭）
+  }
+  
+  delay(20); // 确保电平稳定
+  
+  Serial.print("LED引脚安全初始化完成，极性: ");
+  Serial.println(config.led_active_low ? "低电平有效" : "高电平有效");
+  Serial.print("初始状态: 关闭");
+}
+
+// 测试LED极性函数
+void testLedPolarity() {
+  Serial.println("开始LED极性测试...");
+  
+  // 先确保LED关闭
+  if (config.led_active_low) {
+    digitalWrite(currentLedPin, HIGH);
+  } else {
+    digitalWrite(currentLedPin, LOW);
+  }
+  delay(1000);
+  
+  // 测试开灯
+  Serial.println("测试开灯状态...");
+  if (config.led_active_low) {
+    digitalWrite(currentLedPin, LOW); // 低电平有效，低电平开灯
+  } else {
+    digitalWrite(currentLedPin, HIGH); // 高电平有效，高电平开灯
+  }
+  delay(2000);
+  
+  // 测试关灯
+  Serial.println("测试关灯状态...");
+  if (config.led_active_low) {
+    digitalWrite(currentLedPin, HIGH); // 低电平有效，高电平关灯
+  } else {
+    digitalWrite(currentLedPin, LOW); // 高电平有效，低电平关灯
+  }
+  delay(1000);
+  
+  Serial.println("LED极性测试完成");
+}
 
 void printNetworkInfo() {
   if (WiFi.status() == WL_CONNECTED) {
@@ -141,11 +223,18 @@ bool isValidPin(uint8_t pin) {
 
 void updateLedPin() {
   if (currentLedPin != config.led_pin) {
+    // 先关闭旧引脚并设为输入
     pinMode(currentLedPin, INPUT);
+    
     currentLedPin = config.led_pin;
-    pinMode(currentLedPin, OUTPUT);
-    digitalWrite(currentLedPin, rtcData.ledState ? HIGH : LOW);
-    Serial.print("LED引脚已切换到: GPIO");
+    
+    // 安全初始化新引脚
+    safePinSetup();
+    
+    // 恢复LED状态
+    setLedState(rtcData.ledState);
+    
+    Serial.print("LED引脚已安全切换到: GPIO");
     Serial.println(currentLedPin);
   }
 }
@@ -162,6 +251,8 @@ void loadConfig() {
     strcpy(config.sleep_end, "22:00");
     config.ap_timeout_minutes = 15;
     config.led_pin = 4;
+    config.led_active_low = false; // 默认高电平有效
+    config.enable_sleep = true;    // 默认启用休眠
     config.configured = false;
   } else {
     Serial.println("从EEPROM加载配置成功");
@@ -335,18 +426,52 @@ void setup() {
   AP_MODE_TIMEOUT = config.ap_timeout_minutes * 60 * 1000;
   STARTUP_GRACE_PERIOD = config.ap_timeout_minutes * 60 * 1000;
   
-  memset(&rtcData, 0, sizeof(rtcData));
-  rtcData.ledState = false;
-  rtcData.wifiRetryCount = 0;
-  rtcData.lastSuccessfulTime = 0;
-  rtcData.lastSuccessfulMillis = 0;
-  rtcData.currentNtpIndex = 0;
-  rtcData.startupTime = millis();
-  rtcData.timeEverSynced = false;
+  // 从RTC内存读取数据
+  ESP.rtcUserMemoryRead(0, (uint32_t*)&rtcData, sizeof(rtcData));
+  
+  // 验证CRC
+  uint32_t storedCrc = rtcData.crc32;
+  uint32_t calculatedCrc = calculateCRC32((uint8_t*)&rtcData + 4, sizeof(rtcData) - 4);
+  
+  if (storedCrc != calculatedCrc) {
+    // CRC不匹配，初始化默认值
+    Serial.println("RTC数据无效，使用默认值");
+    memset(&rtcData, 0, sizeof(rtcData));
+    rtcData.ledState = false;
+    rtcData.ledStateBeforeSleep = false;
+    rtcData.inSleepMode = false;
+    rtcData.wifiRetryCount = 0;
+    rtcData.lastSuccessfulTime = 0;
+    rtcData.lastSuccessfulMillis = 0;
+    rtcData.currentNtpIndex = 0;
+    rtcData.startupTime = millis();
+    rtcData.timeEverSynced = false;
+  } else {
+    Serial.println("从RTC内存恢复数据成功");
+    
+    // 如果是从休眠中唤醒，恢复LED状态
+    if (rtcData.inSleepMode) {
+      Serial.println("从深度休眠中唤醒");
+      rtcData.inSleepMode = false;
+      // 恢复休眠前的LED状态
+      rtcData.ledState = rtcData.ledStateBeforeSleep;
+      Serial.print("恢复休眠前LED状态: ");
+      Serial.println(rtcData.ledState ? "开启" : "关闭");
+    }
+  }
   
   currentLedPin = config.led_pin;
-  pinMode(currentLedPin, OUTPUT);
-  digitalWrite(currentLedPin, LOW);
+  
+  // 安全引脚初始化
+  safePinSetup();
+  
+  // 根据保存的状态设置LED
+  setLedState(rtcData.ledState);
+  
+  Serial.print("LED初始化完成，逻辑状态: ");
+  Serial.println(rtcData.ledState ? "开启" : "关闭");
+  Serial.print("休眠功能: ");
+  Serial.println(config.enable_sleep ? "启用" : "禁用");
   
   setupWebServer();
   
@@ -365,6 +490,9 @@ void setup() {
   Serial.println("分钟内不会进入休眠，方便配置");
   Serial.print("当前LED引脚: GPIO");
   Serial.println(currentLedPin);
+  
+  // 启动后测试LED极性
+  testLedPolarity();
 }
 
 void loop() {
@@ -440,13 +568,19 @@ void loop() {
     }
   }
   
-  if (millis() - lastTimeCheck > 30000) {
-    checkSleepTime();
-    lastTimeCheck = millis();
-    
-    if (shouldSleep && WiFi.status() == WL_CONNECTED) {
-      enterDeepSleep();
+  // 休眠检查逻辑 - 只在启用休眠功能时执行
+  if (config.enable_sleep) {
+    if (millis() - lastTimeCheck > 30000) {
+      checkSleepTime();
+      lastTimeCheck = millis();
+      
+      if (shouldSleep && WiFi.status() == WL_CONNECTED) {
+        enterDeepSleep();
+      }
     }
+  } else {
+    // 如果休眠功能被禁用，确保shouldSleep为false
+    shouldSleep = false;
   }
   
   if (client.connected()) {
@@ -456,13 +590,11 @@ void loop() {
       Serial.println(message);
       
       if (message.indexOf("on") != -1) {
-        digitalWrite(currentLedPin, HIGH);
-        rtcData.ledState = true;
+        setLedState(true);
         saveRTCData();
         Serial.println("LED开启");
       } else if (message.indexOf("off") != -1) {
-        digitalWrite(currentLedPin, LOW);
-        rtcData.ledState = false;
+        setLedState(false);
         saveRTCData();
         Serial.println("LED关闭");
       }
@@ -480,6 +612,12 @@ void loop() {
 }
 
 void checkSleepTime() {
+  // 如果休眠功能被禁用，直接返回
+  if (!config.enable_sleep) {
+    shouldSleep = false;
+    return;
+  }
+  
   if (WiFi.status() != WL_CONNECTED) {
     return;
   }
@@ -531,6 +669,13 @@ void checkSleepTime() {
 }
 
 void enterDeepSleep() {
+  // 如果休眠功能被禁用，直接返回
+  if (!config.enable_sleep) {
+    Serial.println("休眠功能已禁用，取消深度休眠");
+    shouldSleep = false;
+    return;
+  }
+  
   unsigned long currentRuntime = millis() - rtcData.startupTime;
   if (currentRuntime < STARTUP_GRACE_PERIOD) {
     Serial.println("启动保护期内，取消深度休眠");
@@ -538,10 +683,23 @@ void enterDeepSleep() {
     return;
   }
   
-  Serial.println("进入深度休眠...");
+  Serial.println("准备进入深度休眠...");
+  
+  // 重要：在休眠前保存当前LED状态，并强制关闭LED
+  rtcData.ledStateBeforeSleep = rtcData.ledState;  // 保存休眠前的状态
+  
+  // 强制关闭LED
+  setLedState(false);
+  delay(100);  // 确保LED完全关闭
+  
+  Serial.println("LED已强制关闭，准备休眠");
   
   rtcData.inSleepMode = true;
   saveRTCData();
+  
+  // 额外保护：在休眠前将引脚设为输入模式，避免休眠期间电平变化
+  pinMode(currentLedPin, INPUT);
+  delay(50);
   
   int currentHour, currentMinute;
   if (getCurrentTime(currentHour, currentMinute)) {
@@ -566,9 +724,18 @@ void enterDeepSleep() {
     Serial.print(sleepSeconds);
     Serial.println(" 秒");
     
+    // 最终确认LED关闭
+    pinMode(currentLedPin, INPUT);
+    delay(100);
+    
     ESP.deepSleep(sleepSeconds * 1000000);
   } else {
     Serial.println("使用默认休眠时间: 1小时");
+    
+    // 最终确认LED关闭
+    pinMode(currentLedPin, INPUT);
+    delay(100);
+    
     ESP.deepSleep(3600 * 1000000);
   }
 }
@@ -669,6 +836,10 @@ void switchToSTAMode() {
   WiFi.softAPdisconnect(true);
   delay(100);
   
+  // 重新初始化LED引脚
+  safePinSetup();
+  setLedState(rtcData.ledState);
+  
   // 初始化时间同步
   if (syncTimeWithRetry()) {
     Serial.println("时间同步成功");
@@ -711,10 +882,22 @@ void printDebugInfo() {
   Serial.println(ntpServers[currentNtpServer]);
   Serial.print("当前时间: ");
   Serial.println(getFormattedTime());
+  Serial.print("LED逻辑状态: ");
+  Serial.println(rtcData.ledState ? "开启" : "关闭");
+  Serial.print("休眠前LED状态: ");
+  Serial.println(rtcData.ledStateBeforeSleep ? "开启" : "关闭");
+  Serial.print("休眠模式: ");
+  Serial.println(rtcData.inSleepMode ? "是" : "否");
+  Serial.print("LED极性: ");
+  Serial.println(config.led_active_low ? "低电平有效" : "高电平有效");
+  Serial.print("休眠功能: ");
+  Serial.println(config.enable_sleep ? "启用" : "禁用");
+  Serial.print("应该休眠: ");
+  Serial.println(shouldSleep ? "是" : "否");
   Serial.println("================");
 }
 
-// Web服务器设置保持不变...
+// Web服务器设置
 void setupWebServer() {
   server.on("/", HTTP_GET, []() {
     String currentTimeStr = getFormattedTime();
@@ -748,6 +931,20 @@ void setupWebServer() {
       pinOptions += "<option value='" + String(pin) + "'" + selected + ">GPIO" + String(pin) + pinDesc + "</option>";
     }
     
+    // LED极性选项
+    String ledPolarityOptions = "";
+    String lowSelected = config.led_active_low ? " selected" : "";
+    String highSelected = !config.led_active_low ? " selected" : "";
+    ledPolarityOptions += "<option value='0'" + highSelected + ">高电平有效 (常见)</option>";
+    ledPolarityOptions += "<option value='1'" + lowSelected + ">低电平有效</option>";
+    
+    // 休眠功能选项
+    String sleepEnableOptions = "";
+    String sleepEnabled = config.enable_sleep ? " selected" : "";
+    String sleepDisabled = !config.enable_sleep ? " selected" : "";
+    sleepEnableOptions += "<option value='1'" + sleepEnabled + ">启用休眠</option>";
+    sleepEnableOptions += "<option value='0'" + sleepDisabled + ">禁用休眠</option>";
+    
     String html = "<!DOCTYPE html><html><head>";
     html += "<title>MzyEsp8266 LED控制器配置</title>";
     html += "<meta charset='UTF-8'>";
@@ -778,6 +975,7 @@ void setupWebServer() {
     html += ".status-message{margin-top:10px;padding:8px;border-radius:4px;text-align:center;font-weight:bold;display:none;}";
     html += ".status-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb;}";
     html += ".status-error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;}";
+    html += ".test-box{background:#fff3cd;border:1px solid #ffeaa7;padding:12px;border-radius:6px;margin:15px 0;text-align:center;}";
     html += "</style>";
     
     html += "<script>";
@@ -814,6 +1012,32 @@ void setupWebServer() {
     html += "}};";
     html += "x.send();";
     html += "}";
+    
+    html += "function testPolarity(){";
+    html += "var btn=document.getElementById('testPolarityBtn');";
+    html += "var m=document.getElementById('statusMessage');";
+    html += "btn.disabled=true;";
+    html += "btn.innerHTML='测试中...';";
+    html += "m.style.display='block';";
+    html += "m.className='status-message';";
+    html += "m.textContent='LED极性测试中，请观察LED状态...';";
+    html += "var x=new XMLHttpRequest();";
+    html += "x.open('GET','/testPolarity',true);";
+    html += "x.onreadystatechange=function(){";
+    html += "if(x.readyState===4){";
+    html += "if(x.status===200){";
+    html += "m.className='status-message status-success';";
+    html += "m.textContent='LED极性测试完成！请观察LED是否正常开关，如果反向请切换极性设置。';";
+    html += "}else{";
+    html += "m.className='status-message status-error';";
+    html += "m.textContent='测试失败';";
+    html += "}";
+    html += "setTimeout(function(){m.style.display='none';},5000);";
+    html += "btn.disabled=false;";
+    html += "btn.innerHTML='🔧 测试LED极性';";
+    html += "}};";
+    html += "x.send();";
+    html += "}";
     html += "</script>";
     html += "</head><body>";
     
@@ -836,6 +1060,12 @@ void setupWebServer() {
       html += "<strong>说明:</strong> 设备启动后" + String(config.ap_timeout_minutes) + "分钟内不会进入休眠模式，方便进行配置";
       html += "</div>";
     }
+    
+    html += "<div class='test-box'>";
+    html += "<strong>🔧 LED极性测试</strong><br>";
+    html += "<p>如果开关反向（开灯变关灯，关灯变开灯），请点击测试按钮并观察LED状态，然后切换极性设置。</p>";
+    html += "<button id='testPolarityBtn' onclick='testPolarity()' style='background:#ff9800;margin:10px 0;'>🔧 测试LED极性</button>";
+    html += "</div>";
     
     html += "<form action='/save' method='POST'>";
     
@@ -875,10 +1105,24 @@ void setupWebServer() {
     html += pinOptions;
     html += "</select>";
     html += "</div>";
+    html += "<div class='form-group'>";
+    html += "<label for='led_active_low'>LED极性:</label>";
+    html += "<select id='led_active_low' name='led_active_low'>";
+    html += ledPolarityOptions;
+    html += "</select>";
+    html += "<small>高电平有效: GPIO高电平时LED亮；低电平有效: GPIO低电平时LED亮。如果开关反向，请切换此设置。</small>";
+    html += "</div>";
     html += "</div>";
     
     html += "<div class='section'>";
     html += "<h3>💤 休眠时间设置</h3>";
+    html += "<div class='form-group'>";
+    html += "<label for='enable_sleep'>启用休眠功能:</label>";
+    html += "<select id='enable_sleep' name='enable_sleep'>";
+    html += sleepEnableOptions;
+    html += "</select>";
+    html += "<small>禁用休眠功能后，设备将不会进入深度休眠模式，始终保持运行状态。</small>";
+    html += "</div>";
     html += "<div class='form-group'>";
     html += "<label for='sleep_start'>休眠开始时间 (HH:MM):</label>";
     html += "<input type='text' id='sleep_start' name='sleep_start' value='" + getSafeConfigValue(config.sleep_start) + "' pattern='[0-9]{2}:[0-9]{2}' placeholder='例如: 22:00'>";
@@ -904,6 +1148,8 @@ void setupWebServer() {
     html += "<p><strong>服务器连接:</strong> " + String(client.connected() ? "✅ 已连接" : "❌ 未连接") + "</p>";
     html += "<p><strong>LED状态:</strong> <span id='ledStatus'>" + String(rtcData.ledState ? "💡 开启" : "🔌 关闭") + "</span></p>";
     html += "<p><strong>LED引脚:</strong> GPIO" + String(config.led_pin) + "</p>";
+    html += "<p><strong>LED极性:</strong> " + String(config.led_active_low ? "低电平有效" : "高电平有效") + "</p>";
+    html += "<p><strong>休眠功能:</strong> " + String(config.enable_sleep ? "✅ 启用" : "❌ 禁用") + "</p>";
     html += "<p><strong>当前时间:</strong> " + currentTimeStr + "</p>";
     html += "<p><strong>时间状态:</strong> " + String(timeSynced ? "✅ 已同步" : "⚠️ 未同步") + "</p>";
     html += "<p><strong>AP超时时间:</strong> " + String(config.ap_timeout_minutes) + "分钟</p>";
@@ -931,7 +1177,6 @@ void setupWebServer() {
     server.send(200, "text/html; charset=UTF-8", html);
   });
 
-  // 其他路由处理保持不变...
   server.on("/save", HTTP_POST, []() {
     if (server.hasArg("ssid")) {
       String ssid = server.arg("ssid");
@@ -968,6 +1213,12 @@ void setupWebServer() {
         config.led_pin = newPin;
       }
     }
+    if (server.hasArg("led_active_low")) {
+      config.led_active_low = server.arg("led_active_low").toInt() == 1;
+    }
+    if (server.hasArg("enable_sleep")) {
+      config.enable_sleep = server.arg("enable_sleep").toInt() == 1;
+    }
     
     saveConfig();
     updateLedPin();
@@ -987,14 +1238,12 @@ void setupWebServer() {
     if (server.hasArg("cmd")) {
       String cmd = server.arg("cmd");
       if (cmd == "on") {
-        digitalWrite(currentLedPin, HIGH);
-        rtcData.ledState = true;
+        setLedState(true);
         saveRTCData();
         Serial.println("通过网页控制: LED开启");
         response = "{\"success\":true,\"message\":\"LED已开启\",\"ledState\":true}";
       } else if (cmd == "off") {
-        digitalWrite(currentLedPin, LOW);
-        rtcData.ledState = false;
+        setLedState(false);
         saveRTCData();
         Serial.println("通过网页控制: LED关闭");
         response = "{\"success\":true,\"message\":\"LED已关闭\",\"ledState\":false}";
@@ -1006,6 +1255,11 @@ void setupWebServer() {
     }
     
     server.send(200, "application/json", response);
+  });
+
+  server.on("/testPolarity", HTTP_GET, []() {
+    testLedPolarity();
+    server.send(200, "text/plain", "LED极性测试完成");
   });
 
   server.on("/syncTime", HTTP_GET, []() {
