@@ -1,0 +1,11 @@
+//=======  ST7789屏幕端连线方式   ==== Begin==/
+屏幕端		Node MCU 端		ESP8266-12F模块
+GND		GND			GND
+VCC		3V			VCC
+SCL（SCK）	D5			IO14
+SDA(MOSI)	D7			IO13
+RES		D4			IO2
+DC		D3			IO0
+CS		GND			GND (如无CS 就不管)
+BL(BLC)		D1			IO5
+//============================== End=======/
