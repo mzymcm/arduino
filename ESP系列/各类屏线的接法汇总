@@ -9,6 +9,18 @@ DC		GPIO6			IO4
 RES		GPIO11			IO2
 SDA(MOSI)	GPIO3			IO13
 SCL（SCK）	GPIO2			IO14
+
+===========================================
+
+屏幕端		ESP8266 NodeMCU ESP-12
+Display VCC		3.3V
+Display GND		GND
+Display LED		3.3V
+Display SCK		D5
+Display SDI/MOSI		D7
+Display DC (RS/AO)		D3
+Display RESET		D4
+Display CS			D8
 //=========== End======================/
 
 #include <Adafruit_GFX.h>
