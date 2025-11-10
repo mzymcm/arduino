@@ -1,14 +1,14 @@
 //=========== ST7789屏幕端连线方式===== Begin==/
-屏幕端		Node MCU 端		ESP8266 (esp01_201)模块
+屏幕端		ESP32C3		ESP8266 (esp01_201)模块
 GND		GND			GND
-VCC		3V			VCC
+VCC		3.3V			VCC
 
-BL(BLC)		D1			IO12
-CS		GND			IO15
-DC		D3			IO4
-RES		D4			IO2
-SDA(MOSI)	D7			IO13
-SCL（SCK）	D5			IO14
+BL(BLC)		GPIO10			IO12
+CS		GPIO7			IO15
+DC		GPIO6			IO4
+RES		GPIO11			IO2
+SDA(MOSI)	GPIO3			IO13
+SCL（SCK）	GPIO2			IO14
 //=========== End======================/
 
 #include <Adafruit_GFX.h>
