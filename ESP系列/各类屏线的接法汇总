@@ -1,11 +1,24 @@
 //=======  ST7789屏幕端连线方式   ==== Begin==/
-屏幕端		Node MCU 端		ESP8266-12F模块
-GND		GND			GND
-VCC		3V			VCC
-SCL（SCK）	D5			IO14
-SDA(MOSI)	D7			IO13
-RES		D4			IO2
-DC		D3			IO0
-CS		GND			GND (如无CS 就不管)
-BL(BLC)		D1			IO5
+屏幕端		Node MCU 端		ESP8266 (esp01_201)模块
+GND					GND						GND
+VCC					3V						VCC
+
+BL(BLC)			D1						IO12
+CS					GND						IO15
+DC					D3						IO4
+RES					D4						IO2
+SDA(MOSI)		D7						IO13
+SCL（SCK）	D5						IO14
 //============================== End=======/
+
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7735.h>
+#include <SPI.h>
+// ESP8266EX  ESP01_201款白板 的ST7735的测试
+#define TFT_BL         12
+#define TFT_CS         15
+#define TFT_DC         4
+#define TFT_RST        2
+#define TFT_MOSI       13  // SDA
+#define TFT_SCLK       14  // SCL
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
