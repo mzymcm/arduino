@@ -1,7 +1,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
 #include <SPI.h>
-// ESP8266EX  ESP01_201款白板 的ST7735的测试
+// ESP8266EX  esp01_201款白板 的ST7735的测试
 #define TFT_BL         12
 #define TFT_CS         15
 #define TFT_DC         4
@@ -146,11 +146,12 @@ void setup() {
   // 初始化背光控制
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, HIGH);
+  
   // 初始化TFT屏幕
   tft.initR(INITR_BLACKTAB);
   tft.setRotation(0); // 根据您的屏幕方向调整
-  tft.fillScreen(BLACK);
-  tft.drawBitmap(0, 0, ZM_image, 128, 128, WHITE);
+  tft.fillScreen(0x0000);
+  tft.drawBitmap(0, 0, ZM_image, 128, 128, 0xFFFF);
   Serial.begin(9600);
   Serial.println("太空人动画启动");
 }
