@@ -11,3 +11,13 @@ dtoverlay=pi3-miniuart-bt
 
 把cmdline.txt中的内容换成
 dwc_otg.lpm_enable=0 console=tty1 console=serial0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait
+
+
+
+
+
+插入网卡后，执行以下命令查看是否识别：
+
+lsusb                  # 查看USB设备ID
+dmesg | grep -i wifi   # 检查内核日志
+iwconfig               # 查看无线接口
