@@ -327,7 +327,8 @@ int main(int argc, char *argv[]) {
     gethostname(hostname, sizeof(hostname));
     
     // 主循环
-    while (1) {
+    int xht=0;
+    while (xht<5) {
         // 获取IP地址
         get_ip_address(eth_ip, sizeof(eth_ip), "eth0");
         get_ip_address(wlan_ip, sizeof(wlan_ip), "wlan0");
@@ -344,8 +345,9 @@ int main(int argc, char *argv[]) {
         oled_draw_string(40, 32, wlan_ip);
         oled_draw_string(0, 48, time_str);
         
-        // 等待5秒
-        sleep(5);
+        // 等待10秒
+        sleep(10);
+        xht++;
     }
     
     // 清理（实际上不会执行到这里）
