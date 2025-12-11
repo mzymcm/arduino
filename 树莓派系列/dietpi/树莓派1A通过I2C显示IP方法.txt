@@ -1,0 +1,389 @@
+// 安装编译环境：
+//  sudo apt install libc6-dev
+//  sudo apt-get install gcc make
+//  编辑两个文件：display_ip.c 和 Makefile
+//  编译程序
+//  make
+//  测试I2C连接
+//  sudo i2cdetect -y 1
+//  运行程序（需要root权限访问I2C）
+//  sudo ./display_ip
+
+
+//=========== Makefile
+
+CC = gcc
+CFLAGS = -Wall -O2
+LIBS = -lm
+TARGET = display_ip
+SOURCES = display_ip.c
+all: $(TARGET)
+$(TARGET): $(SOURCES)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LIBS)
+clean:
+	rm -f $(TARGET)
+install: $(TARGET)
+	sudo cp $(TARGET) /usr/local/bin/
+.PHONY: all clean install
+
+
+//=========== display_ip.c
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/i2c-dev.h>
+#include <net/if.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <time.h>
+
+// SSD1306 OLED配置
+#define OLED_ADDRESS 0x3C  // I2C地址（可能是0x3C或0x3D）
+#define OLED_WIDTH   128
+#define OLED_HEIGHT  64
+
+// I2C文件描述符
+static int i2c_fd;
+
+// OLED命令常量
+#define OLED_COMMAND_MODE  0x00
+#define OLED_DATA_MODE     0x40
+
+// 基本字体（5x8像素）
+static const unsigned char font_5x8[95][5] = {
+    {0x00,0x00,0x00,0x00,0x00}, // 空格
+    {0x00,0x00,0x5F,0x00,0x00}, // !
+    {0x00,0x07,0x00,0x07,0x00}, // "
+    {0x14,0x7F,0x14,0x7F,0x14}, // #
+    {0x24,0x2A,0x7F,0x2A,0x12}, // $
+    {0x23,0x13,0x08,0x64,0x62}, // %
+    {0x36,0x49,0x55,0x22,0x50}, // &
+    {0x00,0x05,0x03,0x00,0x00}, // '
+    {0x00,0x1C,0x22,0x41,0x00}, // (
+    {0x00,0x41,0x22,0x1C,0x00}, // )
+    {0x14,0x08,0x3E,0x08,0x14}, // *
+    {0x08,0x08,0x3E,0x08,0x08}, // +
+    {0x00,0x50,0x30,0x00,0x00}, // ,
+    {0x08,0x08,0x08,0x08,0x08}, // -
+    {0x00,0x60,0x60,0x00,0x00}, // .
+    {0x20,0x10,0x08,0x04,0x02}, // /
+    {0x3E,0x51,0x49,0x45,0x3E}, // 0
+    {0x00,0x42,0x7F,0x40,0x00}, // 1
+    {0x42,0x61,0x51,0x49,0x46}, // 2
+    {0x21,0x41,0x45,0x4B,0x31}, // 3
+    {0x18,0x14,0x12,0x7F,0x10}, // 4
+    {0x27,0x45,0x45,0x45,0x39}, // 5
+    {0x3C,0x4A,0x49,0x49,0x30}, // 6
+    {0x01,0x71,0x09,0x05,0x03}, // 7
+    {0x36,0x49,0x49,0x49,0x36}, // 8
+    {0x06,0x49,0x49,0x29,0x1E}, // 9
+    {0x00,0x36,0x36,0x00,0x00}, // :
+    {0x00,0x56,0x36,0x00,0x00}, // ;
+    {0x08,0x14,0x22,0x41,0x00}, // <
+    {0x14,0x14,0x14,0x14,0x14}, // =
+    {0x00,0x41,0x22,0x14,0x08}, // >
+    {0x02,0x01,0x51,0x09,0x06}, // ?
+    {0x32,0x49,0x79,0x41,0x3E}, // @
+    {0x7E,0x11,0x11,0x11,0x7E}, // A
+    {0x7F,0x49,0x49,0x49,0x36}, // B
+    {0x3E,0x41,0x41,0x41,0x22}, // C
+    {0x7F,0x41,0x41,0x22,0x1C}, // D
+    {0x7F,0x49,0x49,0x49,0x41}, // E
+    {0x7F,0x09,0x09,0x09,0x01}, // F
+    {0x3E,0x41,0x49,0x49,0x7A}, // G
+    {0x7F,0x08,0x08,0x08,0x7F}, // H
+    {0x00,0x41,0x7F,0x41,0x00}, // I
+    {0x20,0x40,0x41,0x3F,0x01}, // J
+    {0x7F,0x08,0x14,0x22,0x41}, // K
+    {0x7F,0x40,0x40,0x40,0x40}, // L
+    {0x7F,0x02,0x0C,0x02,0x7F}, // M
+    {0x7F,0x04,0x08,0x10,0x7F}, // N
+    {0x3E,0x41,0x41,0x41,0x3E}, // O
+    {0x7F,0x09,0x09,0x09,0x06}, // P
+    {0x3E,0x41,0x51,0x21,0x5E}, // Q
+    {0x7F,0x09,0x19,0x29,0x46}, // R
+    {0x46,0x49,0x49,0x49,0x31}, // S
+    {0x01,0x01,0x7F,0x01,0x01}, // T
+    {0x3F,0x40,0x40,0x40,0x3F}, // U
+    {0x1F,0x20,0x40,0x20,0x1F}, // V
+    {0x3F,0x40,0x38,0x40,0x3F}, // W
+    {0x63,0x14,0x08,0x14,0x63}, // X
+    {0x07,0x08,0x70,0x08,0x07}, // Y
+    {0x61,0x51,0x49,0x45,0x43}, // Z
+    {0x00,0x7F,0x41,0x41,0x00}, // [
+    {0x02,0x04,0x08,0x10,0x20}, // "\"
+    {0x00,0x41,0x41,0x7F,0x00}, // ]
+    {0x04,0x02,0x01,0x02,0x04}, // ^
+    {0x40,0x40,0x40,0x40,0x40}, // _
+    {0x00,0x01,0x02,0x04,0x00}, // `
+    {0x20,0x54,0x54,0x54,0x78}, // a
+    {0x7F,0x48,0x44,0x44,0x38}, // b
+    {0x38,0x44,0x44,0x44,0x20}, // c
+    {0x38,0x44,0x44,0x48,0x7F}, // d
+    {0x38,0x54,0x54,0x54,0x18}, // e
+    {0x08,0x7E,0x09,0x01,0x02}, // f
+    {0x0C,0x52,0x52,0x52,0x3E}, // g
+    {0x7F,0x08,0x04,0x04,0x78}, // h
+    {0x00,0x44,0x7D,0x40,0x00}, // i
+    {0x20,0x40,0x44,0x3D,0x00}, // j
+    {0x7F,0x10,0x28,0x44,0x00}, // k
+    {0x00,0x41,0x7F,0x40,0x00}, // l
+    {0x7C,0x04,0x18,0x04,0x78}, // m
+    {0x7C,0x08,0x04,0x04,0x78}, // n
+    {0x38,0x44,0x44,0x44,0x38}, // o
+    {0x7C,0x14,0x14,0x14,0x08}, // p
+    {0x08,0x14,0x14,0x18,0x7C}, // q
+    {0x7C,0x08,0x04,0x04,0x08}, // r
+    {0x48,0x54,0x54,0x54,0x20}, // s
+    {0x04,0x3F,0x44,0x40,0x20}, // t
+    {0x3C,0x40,0x40,0x20,0x7C}, // u
+    {0x1C,0x20,0x40,0x20,0x1C}, // v
+    {0x3C,0x40,0x30,0x40,0x3C}, // w
+    {0x44,0x28,0x10,0x28,0x44}, // x
+    {0x0C,0x50,0x50,0x50,0x3C}, // y
+    {0x44,0x64,0x54,0x4C,0x44}, // z
+    {0x00,0x08,0x36,0x41,0x00}, // {
+    {0x00,0x00,0x7F,0x00,0x00}, // |
+    {0x00,0x41,0x36,0x08,0x00}, // }
+    {0x10,0x08,0x08,0x10,0x08}, // ~
+};
+
+// 发送命令到OLED
+void oled_command(unsigned char cmd) {
+    unsigned char buffer[2];
+    buffer[0] = OLED_COMMAND_MODE;
+    buffer[1] = cmd;
+    if (write(i2c_fd, buffer, 2) != 2) {
+        printf("Failed to send command 0x%02X\n", cmd);
+    }
+}
+
+// 初始化OLED
+void oled_init() {
+    // 初始化序列
+    oled_command(0xAE); // 关闭显示
+    oled_command(0xD5); // 设置显示时钟分频比/振荡器频率
+    oled_command(0x80);
+    oled_command(0xA8); // 多路复用率
+    oled_command(0x3F); // 对于64行
+    oled_command(0xD3); // 显示偏移
+    oled_command(0x00);
+    oled_command(0x40); // 设置显示起始行
+    oled_command(0x8D); // 电荷泵设置
+    oled_command(0x14); // 启用电荷泵
+    oled_command(0x20); // 内存地址模式
+    oled_command(0x00); // 水平地址模式
+    oled_command(0xA1); // 段重映射
+    oled_command(0xC8); // COM扫描方向
+    oled_command(0xDA); // COM引脚配置
+    oled_command(0x12);
+    oled_command(0x81); // 对比度控制
+    oled_command(0xCF); // 对比度值
+    oled_command(0xD9); // 预充电周期
+    oled_command(0xF1);
+    oled_command(0xDB); // VCOMH取消选择级别
+    oled_command(0x40);
+    oled_command(0xA4); // 整体显示开启
+    oled_command(0xA6); // 正常显示（非反转）
+    oled_command(0x2E); // 停用滚动
+    oled_command(0xAF); // 开启显示
+}
+
+// 清除OLED屏幕
+void oled_clear() {
+    // 清除整个屏幕缓冲区
+    unsigned char buffer[OLED_WIDTH + 1];
+    buffer[0] = OLED_DATA_MODE;
+    
+    for (int page = 0; page < 8; page++) {
+        // 设置页面地址
+        oled_command(0xB0 + page);
+        // 设置列地址
+        oled_command(0x00);
+        oled_command(0x10);
+        
+        // 发送空白数据
+        memset(buffer + 1, 0x00, OLED_WIDTH);
+        if (write(i2c_fd, buffer, OLED_WIDTH + 1) != OLED_WIDTH + 1) {
+            printf("Failed to clear page %d\n", page);
+        }
+    }
+}
+
+// 在指定位置显示字符
+void oled_draw_char(int x, int y, char c) {
+    if (c < 32 || c > 126) return; // 只处理可打印字符
+    
+    unsigned char buffer[6];
+    buffer[0] = OLED_DATA_MODE;
+    
+    int char_index = c - 32;
+    for (int i = 0; i < 5; i++) {
+        buffer[i + 1] = font_5x8[char_index][i];
+    }
+    
+    // 设置位置
+    int page = y / 8;
+    int col = x;
+    
+    oled_command(0xB0 + page); // 设置页面
+    oled_command((col & 0x0F) | 0x00); // 设置列低位地址
+    oled_command(((col >> 4) & 0x0F) | 0x10); // 设置列高位地址
+    
+    // 发送字符数据
+    if (write(i2c_fd, buffer, 6) != 6) {
+        printf("Failed to draw character '%c'\n", c);
+    }
+}
+
+// 显示字符串
+void oled_draw_string(int x, int y, const char *str) {
+    int current_x = x;
+    while (*str) {
+        oled_draw_char(current_x, y, *str);
+        current_x += 6; // 字符宽度 + 间距
+        str++;
+        if (current_x >= OLED_WIDTH - 6) break; // 防止溢出
+    }
+}
+
+// 获取网络接口的IP地址
+int get_ip_address(char *buffer, size_t buf_size, const char *interface) {
+    int fd;
+    struct ifreq ifr;
+    struct sockaddr_in *sin;
+    
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) {
+        snprintf(buffer, buf_size, "Error");
+        return -1;
+    }
+    
+    // 设置接口名
+    ifr.ifr_addr.sa_family = AF_INET;
+    strncpy(ifr.ifr_name, interface, IFNAMSIZ-1);
+    
+    // 获取IP地址
+    if (ioctl(fd, SIOCGIFADDR, &ifr) < 0) {
+        close(fd);
+        snprintf(buffer, buf_size, "N/A");
+        return -1;
+    }
+    
+    close(fd);
+    
+    sin = (struct sockaddr_in *)&ifr.ifr_addr;
+    strncpy(buffer, inet_ntoa(sin->sin_addr), buf_size);
+    return 0;
+}
+
+// 获取当前时间字符串
+void get_time_string(char *buffer, size_t buf_size) {
+    time_t now;
+    struct tm *tm_info;
+    
+    time(&now);
+    tm_info = localtime(&now);
+    strftime(buffer, buf_size, "%H:%M:%S", tm_info);
+}
+
+// 主函数
+int main(int argc, char *argv[]) {
+    char eth_ip[16];
+    char wlan_ip[16];
+    char time_str[10];
+    char hostname[64];
+    
+    // 打开I2C总线
+    i2c_fd = open("/dev/i2c-1", O_RDWR);
+    if (i2c_fd < 0) {
+        printf("Failed to open I2C bus\n");
+        return 1;
+    }
+    
+    // 设置I2C从设备地址
+    if (ioctl(i2c_fd, I2C_SLAVE, OLED_ADDRESS) < 0) {
+        printf("Failed to set I2C address 0x%02X\n", OLED_ADDRESS);
+        close(i2c_fd);
+        return 1;
+    }
+    
+    printf("OLED display initialized at address 0x%02X\n", OLED_ADDRESS);
+    
+    // 初始化OLED
+    oled_init();
+    usleep(100000); // 等待100ms初始化完成
+    
+    // 清除屏幕
+    oled_clear();
+    
+    // 获取主机名
+    gethostname(hostname, sizeof(hostname));
+    
+    // 主循环
+    while (1) {
+        // 获取IP地址
+        get_ip_address(eth_ip, sizeof(eth_ip), "eth0");
+        get_ip_address(wlan_ip, sizeof(wlan_ip), "wlan0");
+        get_time_string(time_str, sizeof(time_str));
+        
+        // 清除屏幕并显示信息
+        oled_clear();
+        
+        // 显示标题
+        oled_draw_string(0, 0, "RPi 1A IP");
+        oled_draw_string(0, 16, "Eth:");
+        oled_draw_string(32, 16, eth_ip);
+        oled_draw_string(0, 32, "WLAN:");
+        oled_draw_string(40, 32, wlan_ip);
+        oled_draw_string(0, 48, time_str);
+        
+        // 等待5秒
+        sleep(5);
+    }
+    
+    // 清理（实际上不会执行到这里）
+    close(i2c_fd);
+    return 0;
+}
+
+
+
+
+
+// ======== 创建系统服务
+//  创建服务文件 /etc/systemd/system/display-ip.service
+//  sudo nano /etc/systemd/system/display-ip.service
+//=======  display-ip.service
+
+[Unit]
+Description=Display IP on OLED
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/display_ip
+WorkingDirectory=/home/dietpi
+StandardOutput=journal
+StandardError=journal
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+// ======== 启用服务：
+
+sudo make install
+sudo systemctl daemon-reload
+sudo systemctl enable display-ip
+sudo systemctl start display-ip
