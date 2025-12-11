@@ -1,0 +1,63 @@
+TP-LINK Wireless USB Adapter
+
+rtlwlanu_81xx
+RTL8192cu
+
+RTL8812autplink
+
+
+
+在 Linux 系统中使用 TL-WN823N V2.0（基于 Realtek RTL8192EU 芯片）需要手动安装驱动，因为某些 Linux 发行版可能未默认包含该芯片的驱动。以下是详细步骤：
+
+1. 确认网卡信息
+插入网卡后，执行以下命令查看设备信息：
+
+lsusb
+如果看到类似 Realtek Semiconductor Corp. RTL8192EU 的条目，说明系统已识别硬件但未加载驱动。
+
+2. 安装依赖工具
+确保系统已安装编译工具和内核头文件：
+sudo apt update
+sudo apt install build-essential dkms git linux-headers-$(uname -r)
+
+sudo dnf install kernel-devel gcc git dkms
+3. 安装 RTL8192EU 驱动
+从 GitHub 克隆驱动源码并编译安装：
+
+git clone https://github.com/Mange/rtl8192eu-linux-driver
+cd rtl8192eu-linux-driver
+sudo dkms add .
+sudo dkms install rtl8192eu/1.0
+4. 加载驱动模块
+手动加载驱动模块：
+
+sudo modprobe 8192eu
+5. 禁用冲突驱动（可选）
+某些系统可能加载了错误的内核驱动（如 rtl8xxxu），需将其加入黑名单：
+
+echo "blacklist rtl8xxxu" | sudo tee /etc/modprobe.d/rtl8xxxu-blacklist.conf
+sudo update-initramfs -u  # Debian/Ubuntu
+sudo dracut --force       # Fedora
+6. 重启系统
+
+sudo reboot
+7. 验证驱动状态
+重启后检查网卡是否被识别：
+
+iwconfig   # 查看无线设备名称（如 wlxXXXXXX）
+sudo dmesg | grep 8192eu  # 检查驱动加载日志
+常见问题
+1. 驱动编译失败
+确保安装了正确版本的 linux-headers。
+
+尝试更新内核：
+
+sudo apt upgrade linux-image-$(uname -r)  # Debian/Ubuntu
+2. Secure Boot 导致模块加载失败
+在 UEFI 设置中禁用 Secure Boot，或为驱动模块签名（需手动操作）。
+
+3. 网络不稳定
+调整无线网卡的电源管理策略：
+
+sudo sed -i 's/wifi.powersave = 3/wifi.powersave = 2/' /etc/NetworkManager/conf.d/default-wifi-powersave-on.conf
+sudo systemctl restart NetworkManager

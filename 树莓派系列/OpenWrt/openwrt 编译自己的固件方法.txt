@@ -1,0 +1,33 @@
+openwrt 编译自己的固件方法
+
+1、编译该系统所需要的依赖库：Build system setup
+sudo apt update
+sudo apt install build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget
+
+2、git openwrt系统：
+git clone -b v24.10.0 https://github.com/openwrt/openwrt.git
+
+3、切换到openwrt目录下，运行
+./scripts/feeds update -a
+./scripts/feeds install -a
+
+4、指定定制openwrt系统配置
+make menuconfig
+
+5、开始编译
+如果你对你的网络质量没什么信心，可以先执行一下make download，将需要下载的数据准备好。
+# 查看线程数，用于加速
+nproc 
+make download -j6
+make -j6
+
+
+6、再次编译
+仅清理编译结果（bin目录）
+make clean
+清理所有编译文件（除了.config、dl文件夹和feeds以外都清理）
+make dirclean
+清理所有编译文件以及相关依赖（完全清理干净，一键回到刚git clone下来的时候）
+make distclean
+还原使用make menuconfig对配置文件.config进行的调整
+make defconfig

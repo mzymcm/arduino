@@ -1,0 +1,4 @@
+///备份语句
+exp NEWMCTT/NEWMCTT@orcl file=d:\NEWMC_newback.dmp owner=NEWMCTT
+///恢复语句 （注：恢复前将表空间及用户建好，将已有的表删除后再恢复）
+imp NEWMCTT/NEWMCTT@orcl file=E:\back\NEWMC_newback.dmp full=y

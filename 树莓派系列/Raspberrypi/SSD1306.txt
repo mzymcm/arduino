@@ -1,0 +1,108 @@
+一、启用树莓派的I2C功能
+sudo apt-get install -y python3-smbus
+sudo apt-get install -y i2c-tools
+sudo raspi-config
+
+sudo reboot
+二、安装 Adafruit-SSD1306 库
+Adafruit-SSD1306 是基于 Python 的 OLED 库，可以用于 128×64、128×32 像素 SSD1306 芯片控制的屏幕。
+使用下面的命令安装。
+sudo apt-get install python3-setuptools python3-wheel
+
+安装 PIL 库，有一些图片处理的程序会用到这个。
+sudo apt-get install python3-pil
+使用 pip 安装 Adafruit-SSD1306 库。
+pip3 install Adafruit-SSD1306  --break-system-packages
+
+再下载一份包含代码示例的库后面要用。
+cd ~
+git clone https://github.com/adafruit/Adafruit_Python_SSD1306.git
+
+sudo apt-get install python3-spidev
+sudo apt-get install python3-rpi.gpio
+pip3 install Adafruit_GPIO  --break-system-packages
+
+
+这里顺便提一下，如果上面的 pip 安装 Adafruit-SSD1306 库遇到网络问题，那么也可以在下载完这份代码之后运行下面的命令安装（可选）：
+cd Adafruit_Python_SSD1306
+sudo python3 setup.py install
+进到示例目录，可以看到有一些已经准备好了的代码，后面将屏幕接好之后可以直接运行看效果。y
+cd ~/Adafruit_Python_SSD1306/examples/
+
+下面通过命令检测是否识别到 I2C 设备。
+sudo i2cdetect -y 1
+
+将显示已连接设备的 I2C 地址，不同的屏幕地址可能会不一样，通过这个步骤可以确认一下。
+注意，如果你正在使用的是初代树莓派（256MB的树莓派1代B），那么需要用这个命令：
+
+
+sudo i2cdetect -y 0
+四、编程和运行
+为了快速上手，我们可以直接使用示例代码。其中有一个文件名为 stats.py 的程序，用来显示树莓派的 IP、CPU Load、内存和磁盘使用情况。先拿这个来试试看。
+将之前下载的源码复制到用户目录，用编辑器打开。
+
+
+cd ~
+sudo cp ~/Adafruit_Python_SSD1306/examples/stats.py ~/ls
+
+sudo nano stats.py
+
+
+五、设置开机运行
+为了让 stats.py 能够开机自动运行，我们可以做下面的配置，这样我们就可以不用通过工具或路由器去查找树莓派的 IP 地址等信息了。
+修改 /etc/rc.local 文件。
+
+
+sudo nano /etc/rc.d/rc.local
+sudo nano /etc/rc.local
+在 exit 0 前面增加一行：
+
+
+sudo python3 /home/mzy/stats.py &
+exit 0
+
+systemd  Raspberrypi 方式自动运行
+
+cd /etc/systemd/system
+sudo nano my_star.service
+sudo systemctl start my_star.service
+
+开机启动服务
+systemctl daemon-reload
+使用下面的命令把服务设置为开机自动启动
+sudo systemctl enable my_star.service
+使用下面的命令取消服务的开机自动启动
+sudo systemctl disable my_star.service
+
+
+#####  my_star.service:
+[Unit]
+Description=My_stats
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u stats.py
+WorkingDirectory=/home/mzy
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=mzy
+
+[Install]
+WantedBy=multi-user.target
+
+#############################
+
+[Unit]
+Description=My_stats
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u stats.py
+WorkingDirectory=/home
+
+
+[Install]
+WantedBy=multi-user.target
+
+#############################

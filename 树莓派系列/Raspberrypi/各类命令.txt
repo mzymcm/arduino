@@ -1,0 +1,5 @@
+cat /proc/cpuinfo	#这个命令会打印出CPU的详细信息，包括型号、核心数、频率等。
+lscpu	#总览
+free -m	#查看内存
+df -h	#查看磁盘
+lsb_release -a	#查看系统配置

@@ -1,0 +1,31 @@
+首先安装一下工具软件
+sudo apt-get install cmake git
+使用 github 上的开源代码来实现这个功能，下载代码并安装。
+cd ~
+git clone https://github.com/tasanakorn/rpi-fbcp
+
+
+cd rpi-fbcp/
+mkdir build
+cd build/
+cmake ..
+
+sudo apt-get update
+sudo apt-get install libraspberrypi-dev
+
+make
+sudo install fbcp /usr/local/bin/fbcp
+
+sudo nano /boot/firmware/config.txt
+hdmi_force_hotplug=1
+hdmi_cvt=128 128 60 1 0 0 0
+hdmi_group=2
+hdmi_mode=1
+hdmi_mode=87
+display_rotate=1
+
+如果屏幕闪烁或者出现花屏，可以在/boot/firmware/config.txt中添加如下：
+enable_uart=1
+
+
+

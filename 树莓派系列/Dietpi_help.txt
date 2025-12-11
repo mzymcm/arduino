@@ -1,0 +1,343 @@
+https://dietpi.com/downloads/images/testing/   这里下载最新版本
+
+##### Network options #####
+# Enable Ethernet or WiFi adapter: 1=enable | 0=disable
+# - If both Ethernet and WiFi are enabled, WiFi will take priority and Ethernet will be disabled.
+# - If using WiFi, please edit dietpi-wifi.txt to pre-enter credentials.
+AUTO_SETUP_NET_ETHERNET_ENABLED=1
+AUTO_SETUP_NET_WIFI_ENABLED=1
+
+# Enter your static network details below, if applicable.
+AUTO_SETUP_NET_USESTATIC=0
+AUTO_SETUP_NET_STATIC_IP=192.168.1.121
+AUTO_SETUP_NET_STATIC_MASK=255.255.255.0
+AUTO_SETUP_NET_STATIC_GATEWAY=192.168.1.1
+AUTO_SETUP_NET_STATIC_DNS=114.114.114.114 8.8.8.8
+
+# APT mirrors which are applied to /etc/apt/sources.list | Values here will also be applied during 1st run setup
+# - Raspbian: https://www.raspbian.org/RaspbianMirrors
+# CONFIG_APT_RASPBIAN_MIRROR=http://raspbian.raspberrypi.com/raspbian
+# - Debian: https://www.debian.org/mirror/official#list
+# CONFIG_APT_DEBIAN_MIRROR=https://deb.debian.org/debian
+
+CONFIG_APT_RASPBIAN_MIRROR=http://mirrors.ustc.edu.cn/raspbian/raspbian/
+CONFIG_APT_DEBIAN_MIRROR=http://mirrors.ustc.edu.cn/archive.raspberrypi.org/
+
+
+config.txt
+#-------Serial/UART-----
+# NB: "enable_uart=1" will enforce "core_freq=250" on RPi models with onboard WiFi.
+enable_uart=1
+
+
+##### 树莓派 串口调试乱码 #####
+1. 在config.txt文件中附加：
+dtoverlay=pi3-miniuart-bt
+原有的dtoverlay参数删除
+
+问题：输出的是乱码
+在config.txt文件中附加：
+dtoverlay=pi3-miniuart-bt
+原有的dtoverlay参数删除
+打开SD卡根目录的"cmdline.txt"文件
+plymouth.ignore-serial-consoles 把这个删除掉
+
+2. 把cmdline.txt中的内容换成
+OLD:
+root=PARTUUID=b1a7fcfd-02 rootfstype=ext4 rootwait net.ifnames=0 logo.nologo cfg80211.ieee80211_regdom=GB console=serial0,115200 console=tty1
+NEW:
+dwc_otg.lpm_enable=0 console=tty1 console=serial0, root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait
+
+
+
+dietpi-wifi
+#---------------------------------------------------------------
+# Entry 0
+# - WiFi SSID: required, case sensitive
+aWIFI_SSID[0]='AlxaTax-dd'
+# - WiFi key: If no key/open, leave this blank
+# - In case of WPA-PSK, alternatively enter the 64-digit hexadecimal key returned by wpa_passphrase
+# - Please replace single quote characters ' in your key with '\''. No other escaping is required.
+aWIFI_KEY[0]='3gjx7xrx'
+# - Key type: NONE (no key/open) | WPA-PSK | WEP | WPA-EAP (then use settings below)
+aWIFI_KEYMGR[0]='WPA-PSK'
+# - WPA-EAP options: Only fill if WPA-EAP is set above
+aWIFI_PROTO[0]=''
+aWIFI_PAIRWISE[0]=''
+aWIFI_AUTH_ALG[0]=''
+aWIFI_EAP[0]=''
+aWIFI_IDENTITY[0]=''
+aWIFI_PASSWORD[0]=''
+aWIFI_PHASE1[0]=''
+aWIFI_PHASE2[0]=''
+# - Path to the certificate file, e.g.: /boot/mycert.cer
+aWIFI_CERT[0]=''
+#---------------------------------------------------------------
+# Entry 1
+# - WiFi SSID: required, case sensitive
+aWIFI_SSID[1]='AlxaTax-2'
+# - WiFi key: If no key/open, leave this blank
+# - In case of WPA-PSK, alternatively enter the 64-digit hexadecimal key returned by wpa_passphrase
+# - Please replace single quote characters ' in your key with '\''. No other escaping is required.
+aWIFI_KEY[1]='alssw0483'
+# - Key type: NONE (no key/open) | WPA-PSK | WEP | WPA-EAP (then use settings below)
+aWIFI_KEYMGR[1]='WPA-PSK'
+# - WPA-EAP options: Only fill if WPA-EAP is set above
+aWIFI_PROTO[1]=''
+aWIFI_PAIRWISE[1]=''
+aWIFI_AUTH_ALG[1]=''
+aWIFI_EAP[1]=''
+aWIFI_IDENTITY[1]=''
+aWIFI_PASSWORD[1]=''
+aWIFI_PHASE1[1]=''
+aWIFI_PHASE2[1]=''
+# - Path to the certificate file, e.g.: /boot/mycert.cer
+aWIFI_CERT[1]=''
+
+
+
+https://myssl.com/dns_check.html#dns_check
+http://tool.chinaz.com/dns
+
+sudo nano /etc/hosts
+#  追加 
+20.205.243.166	github.com
+66.220.148.145	github.com
+140.82.116.4	github.com
+10.10.211.68	github.com
+20.27.177.113	github.com
+140.82.113.3	github.com
+140.82.116.3	github.com
+
+185.199.108.133	raw.githubusercontent.com
+185.199.109.133	raw.githubusercontent.com
+185.199.110.133	raw.githubusercontent.com
+185.199.111.133	raw.githubusercontent.com
+10.10.211.68	raw.githubusercontent.com
+
+获取Github的IP地址
+nslookup github.com
+
+获取github.global.ssl.fastly.net的IP地址
+nslookup github.global.ssl.fastly.net
+
+写入hosts文件，刷新缓存
+sudo gedit /etc/hosts
+
+108.160.166.137	http://github.global.ssl.fastly.net
+108.160.166.137	https://github.global.ssl.fastly.net
+140.82.116.4	http://github.com
+140.82.116.4	https://github.com
+
+
+
+
+##### 更换软件源地址
+sudo nano /etc/apt/sources.list
+
+### deb https://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware
+### deb https://deb.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
+### deb https://deb.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+### deb https://deb.debian.org/debian/ bookworm-backports main contrib non-free non-free-firmware
+
+deb https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware
+deb https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
+
+
+
+
+
+禁止树莓派自动休眠，防止树莓派黑屏的教程。
+sudo nano  /etc/lightdm/lightdm.conf
+接着找到[Seat:*]段下的 #xserver-command, 取消注释 , 修改为如下:
+xserver-command=X -s 0 -dpms
+s 0 是设置屏幕保护不启用
+-dpms 是关闭系统的电源节能管理
+保存后退出。
+
+
+
+
+
+
+
+
+
+###### Google 浏览器出出汉字方格情况的解决方法 ##########
+检查系统当前使用的字符编码：
+echo $LANG
+如果输出不是 zh_CN.UTF-8 或 zh_CN.GB18030，则需要修改系统的字符编码设置。
+修改字符编码设置：
+sudo nano $HOME/.bashrc
+export LANG=zh_CN.UTF-8
+在终端中输入以下命令来安装中文字体：  # 文泉驿正黑字体
+sudo apt-get install fonts-wqy-zenhei
+重新加载配置文件
+source $HOME/.bashrc
+
+
+
+
+###### ###### Linux系统安装汉字输入法###### ######
+sudo apt-get purge fcitx ibus
+sudo apt-get autoremove
+
+sudo apt-get update
+sudo locale-gen zh_CN.UTF-8
+echo "export LC_ALL=C" >> /root/.bashrc
+sudo dpkg-reconfigure locales
+source /root/.bashrc
+sudo apt-get install ibus ibus-pinyin ibus-table-wubi
+
+echo "export GTK_IM_MODULE=ibus" >> /root/.bashrc
+echo "export XMODIFIERS=@im=ibus" >> /root/.bashrc
+echo "export QT_IM_MODULE=ibus" >> /root/.bashrc
+source /root/.bashrc
+
+sudo apt-get install im-config
+sudo apt-get install gedit
+
+
+
+
+#############　github.com linux 加速器
+wget -c -O /opt/fastgithub_linux-x64.zip https://gitee.com/chcrazy/FastGithub/releases/download/2.1.4/fastgithub_linux-x64.zip &&
+unzip -d /opt /opt/fastgithub_linux-x64.zip &&
+rm /opt/fastgithub_linux-x64.zip &&
+/opt/fastgithub_linux-x64/fastgithub start
+
+只执行以上就可以，合并了所有命令。
+
+###删除FastGithub Linux版安装包
+rm /opt/fastgithub_linux-x64.zip
+###切换目录
+cd /opt/fastgithub_linux-x64
+###以systemd服务安装并启动，即开机自启动
+sudo /opt/fastgithub_linux-x64/fastgithub start
+###卸载服务
+sudo /opt/fastgithub_linux-x64/fastgithub stop
+###手动启动
+sudo /opt/fastgithub_linux-x64/fastgithub
+
+sudo ./fastgithub start
+以systemd服务安装并启动，即开机自启动
+
+
+
+
+
+查找软件安装目录的方法
+
+find / -name "arduino" 2>/dev/null
+find / -name "staging" 2>/dev/null
+
+/root/.arduino15/staging
+
+
+设置U口串口权限
+sudo chmod 777 /dev/ttyUSB0
+sudo chmod 777 /dev/ttyS0
+//串口测试工具安装
+ls /dev/ttyS*
+ls /dev/ttyUSB*
+sudo apt-get install cutecom
+sudo apt-get install putty
+
+
+
+### 手机屏当raspi屏教程
+https://www.eefocus.com/forum/thread-41500-1-1.html
+
+
+
+### 自动加载usb设备
+基于udisks2的自动挂载
+sudo apt-get install udisks2 gvfs
+通常udisks2会与桌面环境集成，无需额外配置。插入U盘后，系统会自动挂载。
+
+插上U盘，fdisk -l 查看（我的是dev/sdb1）
+创建文件夹 mkdir /mnt/usb
+挂载 mount /dev/sdb1 /mnt/usb
+查看 mount | grep /mnt/usb
+(出现只读，原因是U盘可能损坏而保护，解决不了，于是决定弹出)
+取消挂载 umont /dev/sdb1
+弹出U盘 udisksctl power-off -b /dev/sdb1
+
+
+
+
+
+DietPi_NativePC-BIOS-x86_64-Bookworm_Installer.iso
+
+export PATH=$PATH://usr/local/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin
+
+###### 连接windows的共享文件夹##############
+sudo apt-update
+sudo apt-get install cifs-utils
+mkdir /home/dietpi/windows_share
+sudo mount -t cifs -o username=mzy,password=mcc868686 //192.168.1.36/mzy /home/dietpi/windows_share
+
+
+
+
+
+###### 测试摄像头的工具 ##############
+sudo apt install guvcview
+######################################################
+
+DietPi_NativePC-BIOS-x86_64-Bookworm_Installer.iso
+
+export PATH=$PATH://usr/local/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin
+
+###### 连接windows的共享文件夹##############
+sudo apt-update
+sudo apt-get install cifs-utils
+mkdir /home/dietpi/windows_share
+sudo mount -t cifs -o username=mzy,password=mcc868686 //192.168.1.36/mzy /home/dietpi/windows_share
+
+
+
+############## 下载工具的安装 ##############
+sudo apt-get install uget
+#############################################
+
+##############  程序依赖问题 ##############
+ldconfig 命令来更新链接器缓存，确保系统能找到新安装的库。
+sudo ldconfig
+ldd 命令来检查你的程序依赖哪些库文件
+ldd /opt/wechat/wechat
+搜索包
+sudo apt-cache search <software-packgs>
+检查包是否安装
+sudo find / -name "software-packgs"
+
+
+
+
+
+
+
+
+
+
+##### Arduino packages ##########
+https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/master/STM32/package_stm_index.json
+https://mcudude.github.io/MicroCore/package_MCUdude_MicroCore_index.json
+https://arduino.esp8266.com/stable/package_esp8266com_index.json
+http://drazzy.com/package_drazzy.com_index.json
+
+
+
+sudo chmod +x ./*
+
+
+sudo apt-get install nm-tray
+sudo apt-get purge nm-tray
+sudo apt-get autoremove
+
+
+
+PCManFM
+LX 终端

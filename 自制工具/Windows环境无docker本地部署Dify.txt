@@ -1,0 +1,594 @@
+Windows环境无docker本地部署Dify
+
+说明：前置要求
+Python 3.11
+Node.js 18+
+PostgreSQL 14+
+Redis for Windows
+Git
+Go 1.20+（Windows）
+Ollama (可选，用于本地模型)
+w64devkit-x64
+Git
+
+
+
+一. 安装必要软件
+（1）Python 3.11
+从 https://www.python.org/downloads/release/python-3110/ 下载安装
+安装时勾选 “Add Python to PATH”
+
+（2）vs_BuildTools.exe
+从 https://download.visualstudio.microsoft.com/download/pr/ae26f186-44f0-4ea2-880c-4cf0acbab905/985f13b08eee04b8d0ee5a061652b77f5d4a2d594bcf62ebfbf2b809d0745d03/vs_BuildTools.exe 下载安装
+
+（3）Node.js 18
+从 https://nodejs.org/ 下载 18.x LTS 版本
+设置 npm 镜像：
+npm config set registry https://registry.npmmirror.com
+
+（4）PostgreSQL 14
+从 https://www.postgresql.org/download/windows/ 下载
+记住设置的超级用户密码 difyai123456
+默认端口 5432
+
+### 要在系统环境变量里加入路径设置：
+打开环境变量，在系统变量里，点path 编辑,新建一条路径，添入 C:\PostgreSQL\bin
+
+若已安装 PostgreSQL，可通过以下命令创建数据库：
+# 登录 PostgreSQL 控制台（以 postgres 用户身份）
+psql -U postgres
+-- 创建 dify 数据库
+CREATE DATABASE dify;
+-- 创建 dify_plugin 数据库
+CREATE DATABASE dify_plugin;
+-- 验证数据库是否创建成功
+\l
+-- 退出控制台
+\q
+
+（5）Redis
+从 https://github.com/microsoftarchive/redis/releases 下载
+安装 Redis-x64-3.0.504.msi
+redis.windows.conf 和 redis.windows-service.conf 中修改
+# bind 127.0.0.1
+bind 0.0.0.0
+# requirepass foobared
+requirepass difyai123456
+
+
+（6）安装 Go 1.20+（Windows）
+# 下载安装包（官方地址）https://go.dev/dl/
+https://dl.google.com/go/go1.24.1.windows-amd64.msi
+# 验证安装go version
+# 应输出类似：go version go1.21.0 windows/amd64
+
+编译项目
+在 plugin-daemon 目录下执行：
+# 编译生成二进制文件（输出到当前目录）
+go build -o plugin-daemon.exe ./cmd/
+# 或指定主包路径（根据实际入口调整）
+go build -o plugin-daemon.exe ./cmd/main.go
+如果无法定位入口，使用 go run 自动查找：
+powershell:
+go run ./...
+# 查看项目结构
+tree /F  # Windows 需安装 tree 命令
+# 示例：如果发现 internal/server/main.go
+go build -o plugin-daemon.exe ./internal/server/
+
+（7）安装w64devkit-x64 和 Git
+
+下载安装 w64devkit-x64 ,为后面的服务运行和调试提供支撑
+https://objects.githubusercontent.com/github-production-release-asset-2e65be/262681272/9ff05399-8a99-4947-b45b-aa67fcf5f1d3?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=releaseassetproduction%2F20250326%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250326T010648Z&X-Amz-Expires=300&X-Amz-Signature=05951187460c4346c5d03b7959b36c819c69d8afc665497faf7f32201d3b4ba0&X-Amz-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3Dw64devkit-x64-2.1.0.exe&response-content-type=application%2Foctet-stream
+下载安装 Git-2.49.0-64-bit.exe
+https://objects.githubusercontent.com/github-production-release-asset-2e65be/23216272/c6c1c87b-d3af-4ae8-9cd6-78a4aea72a77?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=releaseassetproduction%2F20250326%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250326T011211Z&X-Amz-Expires=300&X-Amz-Signature=f1dc664c22d23c92fe0fa90578625b6be6910d3a269698010e74b3efa3488e20&X-Amz-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3DGit-2.49.0-64-bit.exe&response-content-type=application%2Foctet-stream
+
+（8）安装模型
+下载Ollama https://ollama.com/download
+A、安装好后设置环境变量：
+新建用户变量
+  1变量名：OLLAMA_MODELS
+  1变量值：D:\Ollama\models
+  2变量名：OLLAMA_HOST
+  2变量值：0.0.0.0
+  3变量名：OLLAMA_ORIGINS
+  3变量值：*
+B、安装好后下载模型如：
+ollama pull nomic-embed-text
+ollama run deepseek-r1:1.5b
+
+
+####  如果要安装成windows的服务，要进行这一步的部署。安装 Chocolatey 通过 PowerShell 安装（需管理员权限） 以 管理员身份 打开 PowerShell 右键点击 PowerShell → 以管理员身份运行
+powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+安装完成后验证：
+choco -v  # 应输出版本号（如 2.2.2）
+安装NSSM（Windows 服务）
+进入powershell环境
+# 安装 NSSM
+choco install nssm -y
+
+
+二. 安装Dify
+从 https://github.com/langgenius/dify 下载
+如果太慢或打不开，请用 https://myssl.com/dns_check.html#dns_check OR https://www.ipaddress.com/  OR http://ip138.com 查询 github.com ，将得到的IP地址加入 C:\Windows\System32\drivers\etc\hosts 中。
+20.205.243.166	github.com
+140.82.116.3	github.com
+140.82.116.4	github.com
+20.205.243.166	github.com
+140.82.116.4	github.com
+140.82.116.3	github.com
+140.82.121.4	github.com
+140.82.121.3	github.com
+20.27.177.113	github.com
+140.82.114.4	github.com
+140.82.112.4	github.com
+140.82.114.3	github.com
+140.82.113.3	github.com
+140.82.113.4	github.com
+140.82.112.3	github.com
+140.82.116.3	github.com
+
+185.199.110.133	raw.githubusercontent.com
+185.199.111.133	raw.githubusercontent.com
+185.199.109.133	raw.githubusercontent.com
+185.199.108.133	raw.githubusercontent.com
+10.10.211.68	raw.githubusercontent.com
+刷新 hosts 再试
+CMD   ipconfig /flushdns
+
+https://github.com/langgenius/dify.git
+https://github.com/langgenius/dify-plugin-daemon.git
+
+git ls-remote https://github.com/langgenius/dify.git   ### 这样可以查看要拉取的版本记录
+#### git clone https://github.com/langgenius/dify.git --branch 0.15.3  这样可以安装以前的版本
+#### git clone https://github.com/langgenius/dify-plugin-daemon.git --branch 0.0.3  这样可以安装以前的版本
+将这两个关键下载或Git下来。
+
+（1）、我们需要先部署 PostgreSQL / Redis / Weaviate（如果本地不可用）
+上面已经安装了PostgreSQL / Redis，现在只对Weaviate部署
+第一步，Weaviate 本身是基于 Go 语言开发的，但官方并未直接提供 Windows 原生安装包。以下方法通过 源码编译 和 依赖服务手动配置 实现：
+1. 配置环境变量：
+# 在 PowerShell 中执行
+[System.Environment]::SetEnvironmentVariable("GOPATH", "C:\Go", "Machine")
+[System.Environment]::SetEnvironmentVariable("PATH", "$env:PATH;C:\Go\bin", "Machine")
+go version  # 输出示例：go version go1.21.0 windows/amd64
+### 如果go 无法下载依赖，可以换代理
+go env -w GOPROXY=https://goproxy.cn,direct
+git clone https://github.com/weaviate/weaviate.git
+cd weaviate
+2. 编译源码
+powershell
+# 设置编译参数
+$env:GOOS="windows"
+$env:GOARCH="amd64"
+# 编译生成可执行文件
+go env -w GOFLAGS="-buildvcs=false"
+go build -o weaviate.exe ./cmd/weaviate-server
+3. 启动依赖服务 Etcd
+Etcd（Weaviate 依赖的键值存储）：https://github.com/etcd-io/etcd/releases/download/v3.5.20/etcd-v3.5.20-windows-amd64.zip
+解压到目录（如 C:\Dify_all\etcd），并将 etcd.exe 和 etcdctl.exe 路径加入环境变量。
+# 新开一个 PowerShell 窗口运行 Etcd
+etcd --data-dir=C:\Dify_all\etcd\data
+
+#####  Dify_etcd.bat ######
+C:\Dify_all\etcd\etcd.exe --data-dir=C:\Dify_all\etcd\data
+##################
+Windows PowerShell：
+nssm install  Dify_etcd "C:\Dify_all\Dify_etcd.bat" AppDirectory C:\Dify_all\etcd
+nssm start Dify_etcd
+####  nssm stop Dify_etcd  停止服务
+####  nssm remove Dify_etcd  删除服务
+
+
+
+
+4. 启动 Weaviate
+cd C:\Dify_all\weaviate
+.\weaviate.exe   --scheme=http   --host=0.0.0.0   --port=8080
+OR
+.\weaviate.exe   --scheme=http   --host=0.0.0.0   --port=8080   --config-file=.\config\default.yaml
+
+
+#####  Dify_weaviate.bat ######
+C:\Dify_all\weaviate\weaviate.exe   --scheme=http   --host=0.0.0.0   --port=8080
+##################
+Windows PowerShell：
+nssm install  Dify_weaviate "C:\Dify_all\Dify_weaviate.bat" AppDirectory C:\Dify_all\weaviate
+nssm start Dify_weaviate
+
+
+
+
+
+（2）、安装API 接口服务、Worker 异步队列使用服务
+1.进入C:\Dify_all\dify\api复制环境变量配置文件：
+copy .env.example .env
+生成一个随机密钥并替换 .env 文件中的 SECRET_KEY 的值：
+awk -v key="$(openssl rand -base64 42)" '/^SECRET_KEY=/ {sub(/=.*/, "=" key)} 1' .env > temp_env && mv temp_env .env
+如果没有这个环境，可以直接使用已有的Key值：
+SECRET_KEY=4U0dM8eM1V+E+910YeoBUWH0vkpgrzWf7Jq5BslYcqgIqcjSbNPHTeqf
+将.env 里的SECRET_KEY填入。
+如果需要外网访问，就要把.env 里 127.0.0.1 换成当前服务器的外网地址 36.137.78.220 。
+2.安装所需的依赖项：
+Dify API 服务使用 Poetry 来管理依赖项。
+python.exe -m pip install --upgrade pip
+pip install poetry
+poetry env use 3.12
+#### 进入虚拟环境
+.venv\Scripts\activate
+poetry install
+
+# 更新 pip
+python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 安装基础依赖
+pip install wheel setuptools -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 安装项目依赖
+poetry self add poetry-plugin-export
+poetry export --output requirements.txt --without-hashes
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 安装 PyTorch 和 AI 相关依赖
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install transformers accelerate optimum -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+#### 退出虚拟环境
+deactivate
+
+A、安装 API 服务器：
+psql -U postgres
+CREATE DATABASE dify;
+\q
+
+#### 进入虚拟环境
+.venv\Scripts\activate
+
+执行数据库迁移到最新版本：
+flask db upgrade
+#### 如果出错，可以试试以下命令。#####
+flask db init
+flask db migrate
+poetry run flask db upgrade
+################################
+
+#### 这三个库安装一下，不安装有可能报错。
+pip install opendal cloudscraper python-magic-bin
+
+#### 退出虚拟环境
+deactivate
+
+### 启动 API 服务器：
+poetry run flask run --host 0.0.0.0 --port=5001 --debug
+输出：
+* Debug mode: on
+INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+INFO:werkzeug:Press CTRL+C to quit
+INFO:werkzeug: * Restarting with stat
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 695-801-919
+
+# 创建服务
+新建一个要启动服务的批处理 Dify_difyAPI.bat
+####  Dify_difyAPI.bat ############################
+cd C:\Dify_all\dify\api
+C:\Python312\Scripts\poetry.exe run flask run --host 0.0.0.0 --port=5001 --debug
+#################################################
+Windows PowerShell：
+nssm install  Dify_difyAPI "C:\Dify_all\Dify_difyAPI.bat" AppDirectory C:\Dify_all\dify\api
+nssm start Dify_difyAPI
+####  nssm stop Dify_difyAPI  停止服务
+####  nssm remove Dify_difyAPI  删除服务
+
+
+B、安装 Worker 异步队列使用服务：
+进入C:\Dify_all\dify\api 执行
+poetry run celery -A app.celery worker -P solo --without-gossip --without-mingle -Q dataset,generation,mail,ops_trace --loglevel INFO
+输出：
+-------------- celery@TAKATOST.lan v5.2.7 (dawn-chorus)
+--- ***** -----
+-- ******* ---- macOS-10.16-x86_64-i386-64bit 2023-07-31 12:58:08
+- *** --- * ---
+- ** ---------- [config]
+- ** ---------- .> app:         app:0x7fb568572a10
+- ** ---------- .> transport:   redis://:**@localhost:6379/1
+- ** ---------- .> results:     postgresql://postgres:**@localhost:5432/dify
+- *** --- * --- .> concurrency: 1 (gevent)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** -----
+ -------------- [queues]
+                .> dataset          exchange=dataset(direct) key=dataset
+                .> generation       exchange=generation(direct) key=generation
+                .> mail             exchange=mail(direct) key=mail
+
+[tasks]
+  . tasks.add_document_to_index_task.add_document_to_index_task
+  . tasks.clean_dataset_task.clean_dataset_task
+  . tasks.clean_document_task.clean_document_task
+  . tasks.clean_notion_document_task.clean_notion_document_task
+  . tasks.create_segment_to_index_task.create_segment_to_index_task
+  . tasks.deal_dataset_vector_index_task.deal_dataset_vector_index_task
+  . tasks.document_indexing_sync_task.document_indexing_sync_task
+  . tasks.document_indexing_task.document_indexing_task
+  . tasks.document_indexing_update_task.document_indexing_update_task
+  . tasks.enable_segment_to_index_task.enable_segment_to_index_task
+  . tasks.generate_conversation_summary_task.generate_conversation_summary_task
+  . tasks.mail_invite_member_task.send_invite_member_mail_task
+  . tasks.remove_document_from_index_task.remove_document_from_index_task
+  . tasks.remove_segment_from_index_task.remove_segment_from_index_task
+  . tasks.update_segment_index_task.update_segment_index_task
+  . tasks.update_segment_keyword_index_task.update_segment_keyword_index_task
+
+[2023-07-31 12:58:08,831: INFO/MainProcess] Connected to redis://:**@localhost:6379/1
+[2023-07-31 12:58:08,840: INFO/MainProcess] mingle: searching for neighbors
+[2023-07-31 12:58:09,873: INFO/MainProcess] mingle: all alone
+[2023-07-31 12:58:09,886: INFO/MainProcess] pidbox: Connected to redis://:**@localhost:6379/1.
+[2023-07-31 12:58:09,890: INFO/MainProcess] celery@TAKATOST.lan ready.
+
+##### 如果启动有问题，估计是（5）Redis 没有设置好，请参考 （5）Redis。
+
+
+# 创建服务
+新建一个要启动服务的批处理 Dify_difyWorker.bat
+####  Dify_difyWorker.bat ############################
+cd C:\Dify_all\dify\api
+C:\Python312\Scripts\poetry.exe run celery -A app.celery worker -P solo --without-gossip --without-mingle -Q dataset,generation,mail,ops_trace --loglevel INFO
+#################################################
+nssm install  Dify_difyWorker "C:\Dify_all\Dify_difyWorker.bat" AppDirectory C:\Dify_all\dify\api
+nssm start Dify_difyWorker
+####  nssm stop Dify_difyWorker 停止服务
+####  nssm remove Dify_difyWorker  删除服务
+
+
+（3）、安装 Web 前端客户端页面服务
+
+1.进入 C:\Dify_all\dify\web 目录
+################### 这两步如果下在不出错，不用执行。######
+安装依赖项。
+npm install
+如果报错执行
+npm install -g npm@11.2.0
+####################################################
+npm i -g pnpm
+pnpm install
+pnpm approve-builds
+在这一步选择后录入“y”结束。
+
+如果有提示react-syntax-highlighter 出错，可以先执行一下下面的。
+npm install react-syntax-highlighter@latest --save
+
+配置环境变量。在当前目录中创建一个名为 .env.local 的文件，并从 .env.example 中复制内容。根据您的要求修改这些环境变量的值：
+copy .env.example .env.local
+配置环境变量
+# For production release, change this to PRODUCTION 示例值‌：DEVELOPMENT（开发环境）；PRODUCTION（生产环境）
+NEXT_PUBLIC_DEPLOY_ENV=DEVELOPMENT
+# The deployment edition, SELF_HOSTED or CLOUD 指定部署的版本，例如自托管（SELF_HOSTED）或云服务（CLOUD）。
+NEXT_PUBLIC_EDITION=SELF_HOSTED
+# The base URL of console application, refers to the Console base URL of WEB service if console domain is
+# different from api or web app domain.
+# example: http://cloud.dify.ai/console/api 控制台应用的基础URL，如果控制台域名与API或Web应用域名不同，则指向WEB服务的控制台基础URL。
+NEXT_PUBLIC_API_PREFIX=http://localhost:5001/console/api
+# The URL for Web APP, refers to the Web App base URL of WEB service if web app domain is different from
+# console or api domain.
+# example: http://udify.app/api Web应用的基础URL，如果Web应用域名与控制台或API域名不同，则指向WEB服务的Web应用基础URL。
+NEXT_PUBLIC_PUBLIC_API_PREFIX=http://localhost:5001/api
+
+# SENTRY
+NEXT_PUBLIC_SENTRY_DSN=
+NEXT_PUBLIC_SENTRY_ORG=
+NEXT_PUBLIC_SENTRY_PROJECT=
+### 可以将 localhost 替换为当前服务器的外网地址 36.137.78.220
+如果不构建，可以直接运行。pnpm run dev
+
+2、构建代码（如果修改了 .env.local 需要重新进行构建）
+pnpm build
+3、启动WEB服务
+将 w64devkit 释放到 web 目录下，运行w64devkit.exe 进入linux环境。
+~ # cd /dify/web
+C:/dify/web # pnpm start
+启动成功后，终端将输出以下信息：
+   ▲ Next.js 15.2.3
+   - Local:        http://localhost:3000
+   - Network:      http://0.0.0.0:3000
+ ✓ Starting...
+ ✓ Ready in 666ms
+访问 http://127.0.0.1:3000 本地部署的 Dify。
+这样可以登录Dify但不能使用插件，还要下一步部署。
+
+####### 如果构建完成，可以进行这一步，进行WEB服务化，就不用上面的非构建化的启动了###########
+先备份 package.json 为 package_back.json
+copy package.json package_back.json
+修改package.json
+将 11行的
+    "start": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public && cross-env PORT=$npm_config_port HOSTNAME=$npm_config_host node .next/standalone/server.js",
+改为：
+    "start": "cross-env PORT=$npm_config_port HOSTNAME=$npm_config_host node .next/standalone/server.js",
+保存
+
+# 创建服务
+新建一个要启动服务的批处理 Dify_difyWEB.bat
+####  Dify_difyWEB.bat ############################
+cd C:\Dify_all\dify\web
+C:\Windows\System32\robocopy.exe ".next\static" ".next\standalone\.next\static" /E /MT:8
+C:\Windows\System32\robocopy.exe "public" ".next/standalone/public" /E /MT:8
+C:\Users\Administrator\AppData\Roaming\npm\pnpm start
+#################################################
+nssm install  Dify_difyWEB "C:\Dify_all\Dify_difyWEB.bat" AppDirectory C:\Dify_all\dify\web
+nssm start Dify_difyWEB
+####  nssm stop Dify_difyWEB  停止服务
+####  nssm remove Dify_difyWEB  删除服务
+
+
+
+（4）、dify-plugin-daemon 插件进程守护服务安装。
+下载或git该源码 https://github.com/langgenius/dify-plugin-daemon.git
+1.进入C:\Dify_all\dify-plugin-daemon复制环境变量配置文件：
+copy .env.example .env
+将.env里的DIFY_INNER_API_KEY换成 Dify/aip/.env 里的 SECRET_KEY=4U0dM8eM1V+E+910YeoBUWH0vkpgrzWf7Jq5BslYcqgIqcjSbNPHTeqf
+将.env里的DIFY_INNER_API_URL 替换为当前服务器的外网地址 36.137.78.220
+将.env里的localhost不要改动。
+# redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=difyai123456
+
+DB_USERNAME=postgres
+DB_PASSWORD=difyai123456
+DB_HOST=localhost
+DB_PORT=5432
+DB_DATABASE=dify_plugin
+以上设置尽量不要改，改错无法访问数据库导致服务启动失败。
+
+# Windows 示例（路径需使用双反斜杠或正斜杠）
+PYTHON_INTERPRETER_PATH=C:\\Python312\\python.exe
+
+2. 编译项目
+在 plugin-daemon 目录下执行：
+1. 设置国内镜像加速（必须）
+# 设置七牛云代理（推荐）
+go env -w GOPROXY=https://goproxy.cn,direct
+# 设置阿里云代理（备用）
+go env -w GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
+# 验证配置
+go env | grep -E "GOPROXY|GOPRIVATE"
+
+# 或指定主包路径（根据实际入口调整）
+go build -o plugin-daemon.exe ./cmd/server
+（如果修改了.env，就要重新编译项目）
+cd C:\dify-plugin-daemon
+plugin-daemon.exe
+
+3. 进程守护（生产环境）
+# 创建服务
+新建一个要启动服务的批处理 Dify_PluginDaemon.bat
+####  run.bat ############################
+cd C:\Dify_all\dify-plugin-daemon
+C:\Dify_all\dify-plugin-daemon\plugin-daemon.exe
+#################################################
+nssm install  Dify_PluginDaemon "C:\Dify_all\Dify_PluginDaemon.bat" AppDirectory C:\Dify_all\dify-plugin-daemon
+nssm start Dify_PluginDaemon
+####  nssm stop Dify_PluginDaemon  停止服务
+####  nssm remove Dify_PluginDaemon  删除服务
+
+
+
+
+
+cd C:\Dify_all\dify-plugin-daemon\dify-plugin-sdks\python
+pip install -e .
+验证安装结果
+pip list | findstr dify-plugin
+# 预期输出：
+# dify_plugin          0.0.1b76     C:\Dify_all\dify-plugin-daemon\dify-plugin-sdks\python
+
+添加项目路径到环境变量：
+PYTHONPATH
+C:\Dify_all\dify-plugin-daemon\dify-plugin-sdks\python
+
+
+
+
+
+
+（4）、端口调试
+在CMD窗口下，录入 resmon  用这个命令查询端口使用情况。
+Dify需要使用到的端口，在防火墙里规则里入站规则里录入。
+# Dify all port：
+3000, 8194, 6379, 5432, 6334, 8123, 9200, 5433, 4000, 8000, 2881, 6600, 465, 5001, 5002, 5003, 5004, 6060, 7946, 7947, 50051, 8300, 8301, 9196, 8080,2380,80,6180
+
+
+######  如果有特殊需要，这里有端口转发的方法。
+端口转发的方法：
+增加一个规则
+netsh interface portproxy add v4tov4 listenaddress=71.68.18.30 listenport=80 connectaddress=192.168.8.100 connectport=5000
+删除一个规则
+netsh interface portproxy delete v4tov4 listenaddress=192.168.8.100 listenport=5000
+显示所有规则
+netsh interface portproxy show all
+
+
+
+
+########  如果需要nginx 反向代理,以下为安装及使用方法：
+
+安装 Nginx：
+powershell
+choco install nginx
+启动 Nginx：
+Start-Service nginx
+验证安装：
+打开浏览器，访问 http://localhost。
+
+下载JDK安装包 https://www.oracle.com/java/technologies/downloads/
+配置JAVA环境变量 
+JAVA_HOME : JDK安装目录
+Path : JDK安装目录\bin
+重启电脑
+下载最新版发行包jar
+下载 https://gitee.com/cym1102/nginxWebUI/releases/download/4.2.8/nginxWebUI-4.2.8.jar 到 C:/home/nginxWebUI/nginxWebUI.jar
+Windows: java -jar -Dfile.encoding=UTF-8 C:/home/nginxWebUI/nginxWebUI.jar --server.port=8080 --project.home=C:/home/nginxWebUI/
+
+Windows PowerShell：
+nssm install  nginxWebUI "C:\home\nginxWebUI\run.bat" AppDirectory C:\home\nginxWebUI
+nssm start nginxWebUI
+
+#####  run.bat ######
+C:\Java\jdk-24\bin\java -jar -Dfile.encoding=UTF-8 C:/home/nginxWebUI/nginxWebUI.jar --server.port=8881 --project.home=C:/home/nginxWebUI/
+##################
+
+参数说明(都是非必填)
+--server.port 占用端口, 默认以8080端口启动
+--project.home 项目配置文件目录，存放数据库文件，证书文件，日志等, 默认为/home/nginxWebUI/
+--spring.database.type=mysql 使用其他数据库，不填为使用本地sqlite数据库，可选mysql
+--spring.datasource.url=jdbc:mysql://ip:port/nginxwebui 数据库url
+--spring.datasource.username=root 数据库用户
+--spring.datasource.password=pass 数据库密码
+
+
+
+
+
+################################################################################
+其他备注内容：
+
+
+问题解决：
+1、看看守护进程是否正常
+http://36.137.78.220:5001/health
+返回：{"pid": 10612, "status": "ok", "version": "1.1.3"}
+
+
+FORCE_VERIFYING_SIGNATURE=false
+
+
+# Log file path
+LOG_FILE=C:\\dify\\logs\\dify.log
+# Log file max size, the unit is MB
+LOG_FILE_MAX_SIZE=20
+# Log file max backup count
+LOG_FILE_BACKUP_COUNT=5
+# Log dateformat
+LOG_DATEFORMAT=%%Y-%%m-%%d %%H:%%M:%%S
+# Log Timezone
+LOG_TZ=UTC
+# Log format
+LOG_FORMAT=%(asctime)s,%(msecs)d %(levelname)-2s [%(filename)s:%(lineno)d] %(req_id)s %(message)s
+LOG_LEVEL=ERROR
+
+
+
+
+‌pip 清除所有已安装库的完整方法‌
+‌1. 方法一：通过 pip freeze 生成卸载列表‌
+‌步骤‌：
+‌导出已安装库列表‌：
+pip freeze > requirements.txt  
+（此命令生成包含所有已安装库及版本的文件 requirements.txt）
+‌批量卸载所有库‌：
+pip uninstall -r requirements.txt -y  
+（-y 参数自动确认卸载，无需手动输入确认）

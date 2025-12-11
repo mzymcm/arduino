@@ -1,0 +1,613 @@
+https://archlinux.org/download/
+
+A、全新的Archlinux学习
+(1)安装前： 查看一下本机IP地址,并修改root用户密码
+ip address
+passwd root
+(2)ssh联接到准备安装的服务器
+1、要验证启动模式，请检查 UEFI 位数：
+cat /sys/firmware/efi/fw_platform_size
+如果命令返回64，则系统将以 UEFI 模式启动并具有 64 位 x64 UEFI。如果命令返回32，则系统以 UEFI 模式启动，并且具有 32 位 IA32 UEFI；虽然支持此功能，但它会将引导加载程序选择限制为 systemd-boot。如果该文件不存在，系统可能会以BIOS（或CSM）模式启动。如果系统未以您所需的模式（UEFI 与 BIOS）启动，请参阅主板手册。
+ArchLinux 只支持UEFI模式启动的电脑，所以第一步便是检查当前电脑是否为UEFI启动，在终端输入以下命令。如果出现大量文件则正常否则该电脑可能不支持安装ArchLinux。
+2、确保您的网络接口已列出并启用
+ip link
+ping archlinux.org
+3、更新系统时钟
+timedatectl set-ntp true
+timedatectl status
+4、换源
+vim /etc/pacman.d/mirrorlist
+sudo echo 'Server = https://mirrors.ustc.edu.cn/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
+sudo echo 'Server = https://mirrors.tuna.tsinghua.edu.cn/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
+sudo echo 'Server = https://repo.huaweicloud.com/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
+sudo echo 'Server = http://mirror.lzu.edu.cn/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
+sudo echo 'Server = http://mirrors.aliyun.com/archlinux/$repo/os/$arch' >> /etc/pacman.d/mirrorlist
+5、更新软件包
+pacman -Syy
+6、对磁盘进行分区
+查看磁盘情况：
+fdisk -l  OR lsblk
+
+
+
+
+https://dietpi.com/
+DietPi-软件
+
+
+
+
+
+
+一、安装输入法
+
+sudo apt-get install scim-pinyin
+sudo apt install fcitx fcitx-table-wbpy
+
+（卸载软件包方法）：sudo apt remove 软件名称
+
+（设置可执行权限）： sudo chmod +X DevSidecar-1.7.3.AppImage
+
+（安装软件的第二种方法）：sudo dpkg -i ./DevSidecar.deb
+
+
+yum install libicu    #先下载依赖包
+
+wget -c https://github.com/dotnetcore/FastGithub/releases/download/2.0.4/fastgithub_linux-x64.zip    # 下载FastGithub
+ 
+unzip fastgithub_linux-x64.zip    #解压
+
+cd fastgithub_linux-x64    #进入到FastGithub文件夹下
+
+./fastgithub    #运行FastGithub
+
+
+
+
+（一）让linux 可以实现windows远程桌面访问
+1、安装Xrdp
+sudo apt install xrdp -y
+2、启动Xrdp服务，并设置开机启动
+systemctl enable xrdp --now
+3、查看Xrdp的启动状态
+systemctl status xrdp
+
+（二）更换本地源
+/etc/apt/sources.list.d/raspi.list
+chmod 777 raspi.list
+
+/etc/apt/sources.list
+
+清华源
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ buster main contrib non-free
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ buster main contrib non-free
+deb https://mirrors.tuna.tsinghua.edu.cn/debian-security/ buster/updates main contrib non-free
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian-security/ buster/updates main contrib non-free
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ buster-updates main contrib non-free
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ buster-updates main contrib non-free
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ buster-backports main contrib non-free
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ buster-backports main contrib non-free
+
+deb https://mirrors.tuna.tsinghua.edu.cn/debian bullseye main contrib non-free
+deb https://mirrors.tuna.tsinghua.edu.cn/debian-security/ bullseye-security main contrib non-free
+deb https://mirrors.tuna.tsinghua.edu.cn/debian bullseye-updates main
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian bullseye main contrib non-free
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian-security/ bullseye-security main contrib non-free
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian bullseye-updates main
+
+
+阿里源
+deb http://mirrors.aliyun.com/debian/ buster main contrib non-free
+deb-src http://mirrors.aliyun.com/debian/ buster main contrib non-free
+deb http://mirrors.aliyun.com/debian-security/ buster/updates main contrib non-free
+deb-src http://mirrors.aliyun.com/debian-security/ buster/updates main contrib non-free
+deb http://mirrors.aliyun.com/debian/ buster-updates main contrib non-free
+deb-src http://mirrors.aliyun.com/debian/ buster-updates main contrib non-free
+deb http://mirrors.aliyun.com/debian/ buster-backports main contrib non-free
+deb-src http://mirrors.aliyun.com/debian/ buster-backports main contrib non-free
+
+
+#目前最靠谱  =======  sources.list
+deb http://mirrors.aliyun.com/debian/ bullseye main non-free contrib
+deb-src http://mirrors.aliyun.com/debian/ bullseye main non-free contrib
+deb http://mirrors.aliyun.com/debian-security/ bullseye-security main
+deb-src http://mirrors.aliyun.com/debian-security/ bullseye-security main
+deb http://mirrors.aliyun.com/debian/ bullseye-updates main non-free contrib
+deb-src http://mirrors.aliyun.com/debian/ bullseye-updates main non-free contrib
+deb http://mirrors.aliyun.com/debian/ bullseye-backports main non-free contrib
+deb-src http://mirrors.aliyun.com/debian/ bullseye-backports main non-free contrib
+
+#目前最靠谱  =======  raspi.list
+deb http://mirrors.tuna.tsinghua.edu.cn/raspberrypi/ bullseye main
+
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bullseye main
+deb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ bullseye main
+
+
+
+sudo apt update & sudo apt upgrade
+
+github加速：修改host文件映射
+
+# GitHub Start
+20.205.243.166	github.com
+159.106.121.75	gist.github.com
+185.199.110.153	assets-cdn.github.com
+185.199.111.133	raw.githubusercontent.com
+151.101.77.194	github.global.ssl.fastly.net
+185.199.108.154	github.githubassets.com 
+# GitHub End
+
+1、windows更新host映射：ipconfig /flushdns
+2、linux更新host映射：
+chmod 777 hosts
+sudo systemctl restart systemd-resolved
+
+
+Windows 命令：ipconfig /flushdns
+Linux 命令： sudo /etc/init.d/nscd restart
+sudo /etc/init.d/networking restart
+
+Mac 命令：sudo killall -HUP mDNSResponder
+
+
+
+二、Debian上安装Docker
+
+步骤
+步骤 1：更新系统
+首先，我们需要确保系统是最新的，以获取最新的软件包和安全更新。
+
+sudo apt update
+sudo apt upgrade
+
+步骤 2：安装必要的软件包
+我们需要安装一些软件包，以便apt可以通过HTTPS使用存储库。
+
+sudo apt install apt-transport-https ca-certificates curl gnupg2 software-properties-common
+
+步骤 3：添加Docker的官方GPG密钥
+为了验证从Docker下载的软件包的真实性，我们需要添加Docker的官方GPG密钥。
+
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+步骤 4：添加Docker的APT存储库
+现在，我们将添加Docker的APT存储库，以便apt可以从中获取Docker软件包。
+
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+步骤 5：更新apt存储库
+我们需要更新apt存储库，以便它包含Docker存储库中的软件包。
+
+sudo apt update
+
+步骤 6：安装Docker Engine
+现在，我们可以使用apt安装Docker Engine。
+
+sudo apt-get install docker-ce docker-ce-cli containerd.io
+
+sudo systemctl start docker
+
+sudo systemctl enable docker
+
+步骤 7：验证安装
+让我们验证一下Docker是否成功安装。
+
+sudo docker run hello-world
+
+这将下载一个简单的Docker映像并在容器中运行它。如果一切正常，您将看到一条消息，确认Docker已正确安装。
+
+步骤 8：（可选）将用户添加到docker组
+为了避免每次运行Docker命令时都需要使用sudo，您可以将当前用户添加到docker组中。
+
+sudo usermod -aG docker $USER
+
+请注意，添加用户到docker组后，需要重新登录才能使更改生效。
+
+现在，您已经成功在Debian上安装了Docker。您可以使用docker命令来管理和运行容器。
+
+希望本篇博客能帮助您顺利安装Docker，并开始使用容器化技术
+
+
+三、安装 Arduino
+sudo apt update && sudo apt install arduino
+
+(一)安装 Espressif 官方 openocd-esp32 工具
+https://openocd.org/
+https://sourceforge.net/projects/openocd/files/latest/download
+
+OR
+通过软件安装工具搜索 OpenOCD 进行安装
+OpenOCD aims to provide debugging, in-system programming and boundary-scan testing for embedded target devices.
+The debugger uses an IEEE 1149-1 compliant JTAG TAP bus master to access on-chip debug functionality available on ARM based microcontrollers or system-on-chip solutions. For MIPS systems the EJTAG interface is supported. Additionally there is support for eSi-RISC, Intel, OpenRISC, RISC-V and ARC controllers.
+
+
+安装OpenOCD环境
+mkdir esp
+cd esp
+git clone --recursive https://github.com/espressif/openocd-esp32.git
+sudo apt install make
+sudo apt install libtool
+sudo apt install pkg-config
+sudo apt install autoconf
+sudo apt install automake
+sudo apt install texinfo
+sudo apt install libusb-1.0
+（这个如果报错，执行以下：）
+sudo apt install libusb-dev
+sudo apt install libusb-1.0-0-dev
+sudo apt install libudev-dev
+
+cd esp/openocd-esp32
+./bootstrap
+./configure
+make
+sudo make install
+
+
+
+环境搭建帮助：https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html
+
+
+sudo usermod -a -G dialout $USER && \
+sudo apt-get install git && \
+wget https://bootstrap.pypa.io/get-pip.py && \
+sudo python3 get-pip.py && \
+sudo pip3 install pyserial && \
+mkdir -p ~/Arduino/hardware/espressif && \
+cd ~/Arduino/hardware/espressif && \
+git clone https://github.com/espressif/arduino-esp32.git esp32 && \
+cd esp32/tools && \
+python3 get.py
+
+
+
+
+cd ~/Arduino/hardware/
+mkdir -p espressif && \
+cd espressif && \
+git clone https://github.com/espressif/arduino-esp32.git esp32 && \
+cd esp32/tools && \
+sudo python3 get.py
+
+
+
+https://espressif.github.io/arduino-esp32/package_esp32_dev_index.json
+
+http://arduino.esp8266.com/stable/package_esp8266com_index.json, https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+cd /esp
+tar -xzf /home/mzy/temp/openocd-esp32.tar.gz
+
+
+
+四、与windows链接共享目录
+
+
+第一种方法：
+smb://192.168.1.36/
+这个方法最好，可正常使用文件。
+
+第二种方法：
+sudo apt install smbclient
+smbclient //192.168.1.36/mzy -U mzy
+
+第三种方法：
+sudo mkdir mzyshare
+sudo mount -t cifs //192.168.1.36/mzy /home/mzy/mzyshare -rw -o username=mzy,password=mcc868686,dir_mode=0777,file_mode=0777
+
+OR
+
+sudo mount -t cifs //192.168.1.36/mzy /home/mzy/mzyshare -w -o username=mzy,password=mcc868686
+
+卸载：sudo umount /home/mzy/mzyshare
+如果被占用：
+fuser -mv /home/mzy/mzyshare
+kill -9 2580
+然后：sudo umount /home/mzy/mzyshare
+
+
+
+
+==============批量更换树莓派软件源   reyuan.sh   ======= begin=====
+
+#!/bin/bash
+# 此脚本可同时更换apt、pip、docker、npm源为国内源，适用于RaspiOS Buster（原Raspbian）。
+
+echo "备份原有apt源..."
+sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
+sudo cp /etc/apt/sources.list.d/raspi.list /etc/apt/sources.list.d/raspi.list.bak
+
+echo "更换apt源..."
+echo "" > /etc/apt/sources.list
+echo "" > /etc/apt/sources.list.d/raspi.list
+
+cat >> /etc/apt/sources.list <<EOF
+deb http://mirrors.tuna.tsinghua.edu.cn/raspberry-pi-os/raspbian/ buster main non-free contrib rpi
+deb-src http://mirrors.tuna.tsinghua.edu.cn/raspberry-pi-os/raspbian/ buster main non-free contrib rpi
+EOF
+
+wget https://mirrors.tuna.tsinghua.edu.cn/raspberry-pi-os/raspbian.public.key
+apt-key add raspbian.public.key
+
+sudo apt -y update
+sudo apt -y upgrade
+
+cat >> /etc/apt/sources.list.d/raspi.list <<EOF
+deb http://mirrors.tuna.tsinghua.edu.cn/raspberrypi/ buster main ui
+EOF
+
+wget https://mirrors.tuna.tsinghua.edu.cn/raspberrypi/raspberrypi.gpg.key
+apt-key add raspberrypi.gpg.key
+echo "更换apt源完成"
+
+echo "更换pip源..."
+pip install pip -U
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+echo "更换pip源完成"
+
+echo "更换docker源..."
+cat >> /etc/docker/daemon.json <<EOF
+{
+  "registry-mirrors": ["https://registry.docker-cn.com"]
+}
+EOF
+
+systemctl restart docker
+
+echo "更换docker源完成"
+
+echo "更换npm源..."
+npm config set registry https://registry.npm.taobao.org
+npm config get registry
+echo "更换npm源完成"
+
+==============批量更换树莓派软件源   reyuan.sh   ======= end=====
+
+
+
+Tiny Core Linux 安装配置
+
+下载 TinyCore-14.0.iso：
+http://www.tinycorelinux.net/14.x/x86/release/TinyCore-14.0.iso
+
+1、设置软件源：
+sudo echo http://mirrors.163.com/tinycorelinux/ > /opt/tcemirror
+
+2、安装系统到硬盘：
+tce-load -wi tc-install-GUI.tcz # 参数：w 是下载，i 是安装
+
+tce-load -wi coreutils.tcz util-linux.tcz
+
+3、执行tc-install 安装后保存，重启
+vga=788 noicons	lang=zh_CN
+最后点proceed等配置结束。
+sudo reboot
+
+注：之后可以随时进 /mnt/sda1/tce/boot/extlinux/extlinux.conf 这个文件里修改配置。
+cat /mnt/sda1/tce/boot/extlinux/extlinux.conf
+
+sftp tc@192.168.1.15		在windows下使用sftp进行下载文件。
+sftp> get /mnt/sda1/tce/boot/extlinux/extlinux.conf  d:\temp\extlinux.conf
+上传修改过的文件：
+sftp> put d:\temp\extlinux.conf /mnt/sda1/tce/boot/extlinux/extlinux.conf
+
+
+sftp> get /etc/profile  d:\temp\profile
+上传修改过的文件：环境变量由iso8859-1改为UTF-8即可
+sftp> put d:\temp\profile /etc/profile
+
+ tce-load -wi wireless_tools.tcz 
+
+****** 开始安装图形化界面
+浏览到安装文件
+浏览到 /mnt/ device /boot 并选择 core.gz 文件。
+
+4、再次设置软件源：
+sudo echo http://mirrors.163.com/tinycorelinux/ > /opt/tcemirror
+
+5、要保存设置：
+backup
+修改root用户密码：
+sudo su
+passwd tc
+录入两次新密码即可
+
+6、安装 OpenSSH 包
+tce-load -wi openssh
+# 使用模板创建 SSH 配置文件
+sudo cp /usr/local/etc/ssh/sshd_config.orig /usr/local/etc/ssh/sshd_config
+# 启动 SSH 服务
+sudo /usr/local/etc/init.d/openssh start
+
+tc@box:~$ cat openssh.sh
+echo tc:mzy1029|sudo chpasswd
+sudo cp /usr/local/etc/ssh/sshd_config.orig /usr/local/etc/ssh/sshd_config
+sudo /usr/local/etc/init.d/openssh start
+
+# 制成 SSH 启动服务
+sudo su
+cd /
+sudo echo 'echo tc:mzy1029|sudo chpasswd' >> /opt/bootlocal.sh
+sudo echo 'sudo cp /usr/local/etc/ssh/sshd_config.orig /usr/local/etc/ssh/sshd_config' >> /opt/bootlocal.sh
+sudo echo 'sudo /usr/local/etc/init.d/openssh start' >> /opt/bootlocal.sh
+
+#安装vnc
+tce-load -wi x11vnc
+运行服务
+x11vnc
+新建一个脚本vnc.sh 确保开机后启动 上传到目录/home/tc/.X.d 下
+sudo su
+cd /
+sudo echo '#!/bin/sh' >> /home/tc/.X.d/vnc.sh
+sudo echo 'x11vnc -passwd mzy1029 -loop -forever' >> /home/tc/.X.d/vnc.sh
+
+tce-load -iw tightvnc.tcz OR  x0vncserver.tcz 
+tightvnc  : Xvnc :0
+rm -rf /tmp/.X0-lock
+x0vncserver : x0vncserver -display :0 -PasswordFile=/home/tc/.vnc/passwd
+vnc4passwd 用来设置密码
+
+
+#安装samba 让其支持smb://访问
+tce-load -wi samba   or  samba3
+tce-load -iw cifs-utils
+sudo echo '/usr/local/etc/init.d/samba start' >> /opt/bootlocal.sh
+mkdir /home/tc/windir
+sudo mount -t cifs //172.16.0.132/ff /home/tc/windir -w -o username=Administrator,password=mzy1029
+
+
+#输出本机的IP地址：
+新建一个脚本a.sh 上传到目录/home/tc/.X.d 下
+#!/bin/sh
+aa=`echo ifconfig`
+bb=`"$aa"|grep 'addr:'|grep ' B'|awk '{print $2}'|awk 'BEGIN{FS=":"}{print $NF}'`
+popup "$bb"
+
+aa=`echo \`ifconfig eth0\``
+bb=`echo "$aa"|grep 'inet'|sed 's/^.*addr://g'|sed 's/Bcast.*$//g'`
+popup "$bb"
+
+############### echo `ifconfig eth0`|grep 'inet'|sed 's/^.*addr://g'|sed 's/Bcast.*$//g'
+
+////////==========写入文件
+sudo su
+cd /
+sudo echo '#!/bin/sh' >> /home/tc/.X.d/a.sh
+sudo echo 'aa=`echo \`ifconfig eth0\``' >> /home/tc/.X.d/a.sh
+sudo echo  'bb=`echo "$aa"|grep '\''inet'\''|sed '\''s/^.*addr://g'\''|sed '\''s/Bcast.*$//g'\''`' >> /home/tc/.X.d/a.sh
+sudo echo  'popup "$bb"' >> /home/tc/.X.d/a.sh
+
+想并发执行，可在shell 中将多个事务用“&”联接。
+
+
+在Linux中，可以使用scp命令通过SSH上传文件到远程服务器。
+scp <本地文件路径> <远程用户名>@<远程服务器IP地址>:<远程文件路径>
+例如：
+scp /path/to/local/file.txt user@192.168.0.1:/path/to/remote/file.txt
+
+del C:\Users\Administrator\.ssh\known_hosts
+scp D:\temp\autosh.sh tc@172.17.59.120:/home/tc/mzy
+
+del C:\Users\Administrator\.ssh\known_hosts
+ssh.exe tc@172.17.59.120
+
+查看硬件型号信息：
+tc@box:~$ lspci
+tce-load -wi firmware-broadcom_bcm43xx.tcz
+
+
+
+
+7、安装文件管理：
+tce-load -wi lxterminal.tcz
+tce-load -wi xfe.tcz
+tce-load -wi cifs-utils.tcz
+tce-load -wi usb-automount.tcz
+tce-load -wi wifi-manager.tcz
+tce-load -wi freerdp.tcz
+tce-load -wi Brave-browser.tcz
+
+7、安装浏览器
+tce-load -wi chromium-browser.tcz
+
+安装“getlocale.tcz”设置中文语言环境
+tce-load -wi getlocale.tcz
+sudo getlocale.sh
+
+8、tce-更新  只需运行sudo tce-update即可批量更新所有内容
+
+9、创建一下简易的http服务
+tce-load -iw busybox-httpd
+mkdir /home/tc/public_html
+sudo /usr/local/httpd/sbin/httpd -p 80  -h /home/tc/public_html -u tc:staff
+mkdir -p /home/tc/public_html/cgi-bin
+cp /usr/local/httpd/index.cgi  /home/tc/public_html/cgi-bin
+#确保它具有适当的权限
+$chmod 755   /home/tc/public_html/cgi-bin/index.cgi 
+sudo echo 'sudo /usr/local/httpd/sbin/httpd -p 80  -h /home/tc/public_html -u tc:staff' >> /opt/bootlocal.sh
+
+
+10、使用squashfs-tools解压，压缩tcz软件包。
+安装 squashfs-tools
+tce-load -iw squashfs-tools
+
+squashfs-tools解压tcz包。
+squashfs-tools用unsquashfs 直接跟软件包解压：
+
+aa=`echo \`netstat \-antup\`` 
+bb=`echo "$aa"|grep 'vnc'|sed 's/^.*x11//g'|sed 's/ tcp.*$//g'`
+popup "$bb"
+
+
+#########=======   各个目录的含义：
+
+/bin二进制可执行命令
+/dev设备特殊文件
+/etc系统管理和配置文件
+/etc/rc.d启动的配置文件和脚本
+/home用户主目录的基点，比如用户user的主目录就是/home/user，可以用~user表示
+/lib标准程序设计库，又叫动态链接共享库，作用类似windows里的.dll文件
+/sbin系统管理命令，这里存放的是系统管理员使用的管理程序
+/tmp公用的临时文件存储点
+/root系统管理员的主目录
+/mnt系统提供这个目录是让用户临时挂载其他的文件系统。
+/lost+found这个目录平时是空的，系统非正常关机而留下“无家可归”的文件(windows下叫什么.chk)就在这里
+/proc虚拟的目录，是系统内存的映射。可直接访问这个目录来获取系统信息。
+/var某些大文件的溢出区，比方说各种服务的日志文件
+/usr最庞大的目录，要用到的应用程序和文件几乎都在这个目录。其中包含：
+/usr/x11r6存放xwindow的目录
+/usr/bin众多的应用程序
+/usr/sbin超级用户的一些管理程序
+/usr/doclinux文档
+/usr/includelinux下开发和编译应用程序所需要的头文件
+/usr/lib常用的动态链接库和软件包的配置文件
+/usr/man帮助文档
+/usr/src源代码，linux内核的源代码就放在/usr/src/linux里
+/usr/local/bin本地增加的命令
+/usr/local/lib本地增加的库根文件系统
+
+
+
+tce-load -iw ezremaster.tcz
+mkdir /tmp/pp
+sudo chmod 777 /tmp/pp
+sudo mount -t cifs //192.168.1.36/Public/temp /tmp/pp -w -o username=mzy,password=mcc868686
+
+sudo cp /tmp/ezremaster/ezremaster.iso /tmp/pp
+
+
+
+
+++++单片机和周边模块使用的介绍网站++++++
+（01）、http://wiki.ultirobot.com/		传感模块网站
+（02）、https://www.lidihuo.com/		超级学习网站
+（03）、https://bellard.org/			一个内容高深的网站
+（04）、https://developer.mozilla.org/zh-CN/	编程帮助站
+（05）、https://hackaday.io/			全球最大的合作硬体开发社群
+（06）、https://mirrorz.org/			国内所有镜像源
+（07）、https://tools.fun/			干净的在线工具集
+（08）、https://github.com/s-matyukevich/raspberry-pi-os/tree/master	树莓派培训
+（09）、https://www.digitalocean.com/community/tools/nginx?global.app.lang=zhCN	NGINX 配置配置高性能、安全、稳定的NGINX服务器的最简单方法。
+（10）、https://circuits4you.com/		物联网世界
+（11）、https://linux265.com/			免费资源
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

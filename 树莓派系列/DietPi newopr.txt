@@ -1,0 +1,176 @@
+
+linux img 转iso
+在Linux中，可以使用以下命令将img文件转换为iso文件：
+
+$ sudo dd if=/path/to/img/file of=/path/to/iso/file bs=2M
+
+
+
+
+一、修改hosts文件
+nano /etc/hosts
+以下为修改的内容：
+127.0.0.1 localhost
+127.0.1.1 DietPi
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+# 新增 通过 https://www.nslookup.io/ 查询到的ip地址
+151.101.76.133 raw.githubusercontent.com
+#192.30.255.112  github.com
+#151.101.0.133 raw.githubusercontent.com
+#185.199.109.133 raw.githubusercontent.com
+#151.101.76.133 raw.githubusercontent.com
+192.30.255.113 github.com
+185.199.109.133 raw.githubusercontent.com
+185.199.111.133 raw.githubusercontent.com
+
+
+二、修改软件下载源
+nano /etc/apt/sources.list
+#  deb http://raspbian.raspberrypi.org/raspbian/ bookworm main contrib non-free
+deb https://mirrors.tuna.tsinghua.edu.cn/raspbian/raspbian/ bookworm main contrib non-free
+deb https://mirrors.cloud.tencent.com/raspbian/raspbian/ bookworm main contrib non-free
+deb https://mirrors.ustc.edu.cn/raspbian/raspbian/ bookworm main contrib non-free
+
+nano /etc/apt/sources.list.d/raspi.list
+# deb https://archive.raspberrypi.org/debian/ bookworm main
+deb https://mirrors.tuna.tsinghua.edu.cn/raspberrypi/ bookworm main
+deb https://mirrors.cloud.tencent.com/raspberrypi/ bookworm main
+deb https://mirrors.ustc.edu.cn/archive.raspberrypi.org/debian/ bookworm main
+
+
+useradd -m -s /bin/bash mzy
+nano /etc/sudoers
+增加用户
+mzy    ALL=(ALL:ALL) ALL
+sudo passwd mzy
+
+sudo apt update
+sudo apt upgrade -y
+
+
+sudo apt-get install python3-pip
+aarch64-linux-gnu-gcc
+
+pip install raspi-gpio
+import RPi.GPIO as GPIO
+from spidev import SpiDev
+
+wiringPi
+
+   3V3		( 1)  ( 2) 	5V
+ GPIO2(SDA.1)	( 3)  ( 4) 	5V
+ GPIO3(SCL,1)	( 5)  ( 6)	GND
+ GPIO4(GPCLK0)	( 7)  ( 8)	GPIO14(TXD)
+   GND		( 9)  (10)	GPIO15(RXD)
+GPIO17		(11)  (12)	GPIO18
+GPIO27		(13)  (14)	GND
+GPIO22		(15)  (16)	GPIO23
+   3V3		(17)  (18)	GPIO24
+GPIO10(MOSI SDA D1)	(19)  (20)	GND
+GPIO 9(MISO)	(21)  (22)	GPIO25
+GPIO11(SCLK D0)	(23)  (24)	GPIO8(CE0)
+   GND		(25)  (26)	GPIO7(CE1)
+ GPIO0(ID_SD)	(27)  (28)	GPIO1(SCL.0 ID_SC)
+ GPIO5		(29)  (30)	GND
+ GPIO6		(31)  (32)	GPIO12
+GPIO13(PWM1)	(33)  (34)	GND
+GPIO19(PCM_FS)	(35)  (36)	GPIO16
+GPIO26		(37)  (38)	GPIO20(PCM_DIN)
+   GND		(39)  (40)	GPIO21(PCM_DOUT)
+
+GND脚和树莓派的GND连接；
+VCC接到3.3V脚；
+D0接到树莓派的SCLK脚（第23号脚），即BCM.11脚；
+D1接到MOSI脚（第19号脚），即BCM.10；
+RES接到BCM.17脚，即第11号脚；
+DC接到BCM.22脚，即第15号脚；
+CS接到CE0脚（第24号脚）。
+总之，除了RES和DC是可以任意指定GPIO口，其他引脚是必须和树莓派上的指定脚连接的。
+
+
+pip3 list
+
+import PRi.GPIO as GPIO
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(26,GPIO.OUT)
+
+export PYTHONPATH=/usr/lib/python3/dist-packages:$PYTHONPATH
+
+
+which python3
+whereis python3
+
+
+sudo apt-get install python3-pip
+
+sudo pip3 install --upgrade pip
+
+useradd mzy
+passwd mzy
+usermod -aG sudo mzy
+
+
+三、修改dietpi.txt 中的apt镜像地址和其他设置
+nano /boot/dietpi.txt
+CONFIG_APT_RASPBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/raspbian/
+CONFIG_APT_DEBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian/
+CONFIG_CHECK_DIETPI_UPDATES=0
+apt upgrade
+
+sudo apt-get update
+apt install task-gnome-desktop
+
+
+
+
+四、安装桌面
+（一）各屏与管理界面关系
+window manager	display manager
+GNOME		gdm3
+Xfce		lightdm
+KDE		kdm,sddm
+LXDE		LXDM
+gdm3 => Gnome Display Manager  apt install gnome-boxes
+sddm => X11 OR KDE display manager
+lxdm =>  LXDE display manager
+xdm =>   Xorg's default display manager.
+lightdm => Desktop-independent customizable display manager
+slim => Desktop-independent graphical login manager for X11
+wdm => WINGs Display Manager (using the WINGs widget-set used in Window Maker)
+nodm => Automatically start an X session at system boot (without prompting password, for single user environment).
+（二）安装软件
+apt-get install gdm3
+apt-get install task-gnome-desktop
+apt install xorgxrdp
+（三）选择默认屏管
+dpkg-reconfigure gdm3
+systemctl start gdm3
+（查看）已选择屏管
+cat /etc/X11/default-display-manager
+systemctl status display-manager
+
+
+信号	ST7735	树莓
+SCLK	SCK	gpio 23
+MOSI	SDA	gpio 19
+RESET	RESET	gpio 22
+DC	A0	gpio 18
+VCC	VCC	gpio 1
+CS	CS	gppio 24
+LED	LED	gpio 1
+GND	GND	gpio 9
+
+液晶屏 |树莓派
+-----------------------|----------------------------
+LCD(BLK)		| 3.3V(不可以是5V！！)
+SCK		| GPIO19
+SDA		| GPIO13
+AO(DC)		| GPIO17
+RESET(RST)	| GPIO27
+CS		| GPIO23
+GND		| GND
+VCC		| 3.3V(不可以是5V！！)
+
+sudo modprobe fbtft_device name=rpi-display gpios=reset:25,dc:24,led:18 rotate=90

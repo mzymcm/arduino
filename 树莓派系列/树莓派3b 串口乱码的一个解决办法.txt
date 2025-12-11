@@ -1,0 +1,13 @@
+树莓派3b 串口乱码的一个解决办法
+
+
+首先确认波特率设置正确，为115200
+向microSD卡中烧录树莓派官方的镜像后，先不要急着把它插入树莓派中。
+在电脑上打开microSD卡，按如下方式修改config.txt和cmdline.txt这两个文件，
+
+在config.txt文件中附加
+dtoverlay=pi3-miniuart-bt
+
+
+把cmdline.txt中的内容换成
+dwc_otg.lpm_enable=0 console=tty1 console=serial0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait

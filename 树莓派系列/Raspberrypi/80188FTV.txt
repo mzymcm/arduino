@@ -1,0 +1,359 @@
+nmcli dev wifi list
+
+
+sudo nmcli --ask dev wifi connect AlxaTax-2 password alssw0483
+AlxaTax-2
+alssw0483
+
+sudo nmcli --ask dev wifi connect AlxaTax-dd password 3gjx7xrx
+AlxaTax-dd
+3gjx7xrx
+
+RTL8188CUS
+RTL8188FTV
+
+RTL8188CUS rtl8192cu: Loading firmware rtlwifi/rtl8192cufw_TMSC.bin
+
+#更新软件源列表
+sudo apt-get update
+#更新软件版本
+sudo apt-get upgrade
+sudo apt-get dist-upgrade
+
+sudo nano /etc/apt/sources.list
+
+# 默认注释了源码镜像以提高 apt update 速度，如有需要可自行取消注释
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
+# deb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
+
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
+# deb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
+
+deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
+# deb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
+
+# 以下安全更新软件源包含了官方源与镜像站配置，如有需要可自行修改注释切换
+deb https://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+# deb-src https://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+
+
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys [KEY]
+
+
+To install and set up the Realtek Semiconductor Corp. RTL8188FTV 802.11b/g/n 1T1R 2.4G WLAN Adapter driver in Kali Linux
+
+First, install the necessary packages:
+
+sudo apt-get update
+sudo apt-get install build-essential git dkms linux-headers-$(uname -r)
+
+
+sudo apt-get install rpi-update
+sudo rpi-update
+
+
+6.6.51+rpt-rpi-v6
+
+如果安装linux-headers-$(uname -r) 报错，可用以下方法
+sudo apt install linux-headers-generic
+
+
+First, install the necessary packages:
+
+git clone https://github.com/kelebek333/rtl8188fu
+Then, build and install the driver:
+
+sudo dkms add ./rtl8188fu
+sudo dkms build rtl8188fu/1.0
+sudo dkms install rtl8188fu/1.0
+Copy the firmware file to the correct location:
+
+sudo cp ./rtl8188fu/firmware/rtl8188fufw.bin /lib/firmware/rtlwifi/
+
+Finally, load the driver module:
+
+sudo modprobe rtl8xxxu
+
+or
+
+sudo modprobe rtl8188fu
+If you still encounter issues, you can try to blacklist the conflicting drivers and then load the correct driver:
+
+sudo echo "blacklist rtl8192cu" >> /etc/modprobe.d/blacklist.conf
+sudo echo "blacklist rtl8192c_common" >> /etc/modprobe.d/blacklist.conf
+sudo modprobe rtl8188fu
+
+sudo echo "blacklist rtl8192cu" >> /etc/modprobe.d/blacklist.conf
+sudo echo "blacklist rtl8192c_common" >> /etc/modprobe.d/blacklist.conf
+sudo modprobe rtl8188fu
+
+or
+
+
+sudo echo "blacklist rtl8192cu" >> /etc/modprobe.d/blacklist.conf
+sudo echo "blacklist rtl8192c_common" >> /etc/modprobe.d/blacklist.conf
+sudo modprobe rtl8xxxu
+After loading the driver, you can check if the wireless adapter is recognized by running:
+
+ifconfig
+
+or 
+
+ip link show
+
+
+
+
+
+
+
+
+
+
+sudo apt-get update
+sudo apt-get install git
+sudo apt-get install dkms
+
+git clone https://github.com/kelebek333/rtl8188fu
+sudo cp ./rtl8188fu/firmware/rtl8188fufw.bin /lib/firmware/rtlwifi/
+sudo dkms add ./rtl8188fu
+sudo dkms build rtl8188fu/1.0
+sudo dkms install rtl8188fu/1.0
+
+
+
+
+sudo apt-get update
+sudo apt-get install python3-pip python3-dev python3-spidev python3-pil python3-numpy
+sudo python -m pip install st7735 --break-system-packages
+
+
+
+
+
+如何安装
+sudo apt-get install build-essential git dkms linux-headers-$(uname -r)
+
+git clone https://github.com/kelebek333/rtl8188fu
+
+sudo dkms install ./rtl8188fu
+
+sudo cp ./rtl8188fu/firmware/rtl8188fufw.bin /lib/firmware/rtlwifi/
+
+配置
+禁用电源管理
+运行以下命令以解决禁用电源管理和插拔/重新插拔问题。
+
+sudo mkdir -p /etc/modprobe.d/
+
+sudo touch /etc/modprobe.d/rtl8188fu.conf
+
+echo "options rtl8188fu rtw_power_mgnt=0 rtw_enusbss=0 rtw_ips_mode=0" | sudo tee /etc/modprobe.d/rtl8188fu.conf
+
+禁用 MAC 地址欺骗
+运行以下命令以禁用 MAC 地址欺骗（注意：在基于 Ubuntu 的发行版上不需要这样做。MAC 地址欺骗已在 Ubuntu 基础上禁用）。
+
+sudo mkdir -p /etc/NetworkManager/conf.d/
+
+sudo touch /etc/NetworkManager/conf.d/disable-random-mac.conf
+
+echo -e "[device]\nwifi.scan-rand-mac-address=no" | sudo tee /etc/NetworkManager/conf.d/disable-random-mac.conf
+
+内核 5.15 和 5.16 的黑名单（别名）（内核 5.17 及更高版本不需要）
+如果你使用的是内核 5.15 和 5.16，你必须使用以下命令创建一个配置文件，以防止 rtl8188fu 模块与内置的 r8188eu 模块发生冲突。
+
+echo 'alias usb:v0BDApF179d*dc*dsc*dp*icFFiscFFipFFin* rtl8188fu' | sudo tee /etc/modprobe.d/r8188eu-blacklist.conf
+
+内核 6.2 及更高版本的黑名单（别名）
+如果你使用的是 kernel 6.2 及以上版本，则必须使用以下命令创建一个配置文件，以防止 rtl8188fu 模块与内置的 rtl8xxxu 模块冲突。
+
+echo 'alias usb:v0BDApF179d*dc*dsc*dp*icFFiscFFipFFin* rtl8188fu' | sudo tee /etc/modprobe.d/rtl8xxxu-blacklist.conf
+
+然后你必须更新 initramfs
+对于 initramfs
+
+sudo update-initramfs -u
+
+适用于 dracut
+
+sudo dracut -q --force
+
+启用 rtl8188fu 模块
+运行以下命令（最高内核 6.1
+
+sudo modprobe rtl8188fu
+
+对于内核 6.2 及更高版本，请运行以下命令
+
+sudo modprobe -r rtl8188fu
+
+sudo modprobe rtl8188fu
+
+如何卸载
+sudo dkms remove rtl8188fu/1.0 --all
+
+sudo rm -f /lib/firmware/rtlwifi/rtl8188fufw.bin
+
+sudo rm -f /etc/modprobe.d/rtl8188fu.conf
+
+如何从 PPA 存储库安装
+您可以使用 PPA 中的以下命令安装 rtl8188fu 驱动程序。
+
+适用于 xUbuntu 16.04-18.04-20.04-22.04-23.04-23.10 / Linux Mint 20.x-21.x
+
+sudo add-apt-repository ppa:kelebek333/kablosuz
+
+sudo apt-get update
+
+sudo apt install rtl8188fu-dkms
+
+您可以使用以下命令清除软件包
+
+sudo apt purge rtl8188fu-dkms
+
+
+
+
+
+
+
+
+
+要在树莓派 3B 上驱动 ST7735 LCD 屏幕并显示 "Hello World"，你可以使用 Linux 内核中的 SPI 驱动程序以及帧缓冲驱动程序来控制显示屏。下面是一个详细的步骤，包括硬件连接、内核配置、驱动安装以及代码实现。
+
+### 1. 硬件连接
+
+首先，将 ST7735 屏幕连接到树莓派 3B 的 SPI 接口。以下是标准的连接方式：
+
+- **VCC** → 3.3V
+- **GND** → GND
+- **SCL (SCK)** → GPIO 11 (Pin 23)
+- **SDA (MOSI)** → GPIO 10 (Pin 19)
+- **RES (Reset)** → GPIO 25 (Pin 22)
+- **DC (Data/Command)** → GPIO 24 (Pin 18)
+- **CS (Chip Select)** → GPIO 8 (Pin 24)
+
+### 2. 启用 SPI 接口
+
+SPI 是默认禁用的，因此需要启用它：
+
+1. 打开 Raspberry Pi 配置工具：
+
+   ```bash
+   sudo raspi-config
+   ```
+
+2. 选择 **Interfacing Options** → **SPI**，然后选择 **Yes** 启用 SPI。
+
+3. 重启 Raspberry Pi：
+
+   ```bash
+   sudo reboot
+   ```
+
+### 3. 安装必要的库和工具
+
+安装 Python 库和工具来与 ST7735 屏幕交互：
+
+```bash
+sudo apt-get update
+sudo apt-get install python3-pip python3-dev python3-spidev python3-pil python3-numpy
+sudo pip3 install st7735
+```
+
+### 4. 配置设备树
+
+如果你想通过 Linux 帧缓冲设备（`/dev/fb1`）来控制 ST7735，可以使用设备树配置 ST7735：
+
+1. 打开设备树文件：
+
+   ```bash
+   sudo nano /boot/config.txt
+   ```
+
+2. 添加以下行来启用 SPI 并配置 ST7735：
+
+   ```bash
+   dtoverlay=spi0-hw-cs
+   dtoverlay=pitft28-resistive,rotate=90,speed=32000000,fps=60
+   ```
+
+   这里的 `rotate` 参数可以根据需要调整屏幕方向。
+
+3. 保存文件并退出，然后重启 Raspberry Pi：
+
+   ```bash
+   sudo reboot
+   ```
+
+### 5. 使用 Python 脚本显示 "Hello World"
+
+以下是一个简单的 Python 脚本，使用 `st7735` 库在屏幕上显示 "Hello World"：
+
+```python
+import ST7735
+from PIL import Image, ImageDraw, ImageFont
+
+# 创建ST7735 LCD实例
+disp = ST7735.ST7735(
+    port=0,
+    cs=0,
+    dc=24,
+    backlight=18,
+    rst=25,
+    width=160,
+    height=128,
+    rotation=90,
+    spi_speed_hz=4000000
+)
+
+# 初始化显示屏
+disp.begin()
+
+# 创建一个图像对象
+width = disp.width
+height = disp.height
+image = Image.new('RGB', (width, height))
+draw = ImageDraw.Draw(image)
+
+# 填充背景颜色
+draw.rectangle((0, 0, width, height), outline=0, fill=(0, 0, 0))
+
+# 加载字体
+font = ImageFont.load_default()
+
+# 定义显示的文本
+text = "Hello World"
+
+# 计算文本的位置
+text_size = draw.textsize(text, font)
+text_x = (width - text_size[0]) // 2
+text_y = (height - text_size[1]) // 2
+
+# 绘制文本
+draw.text((text_x, text_y), text, font=font, fill=(255, 255, 255))
+
+# 显示图像
+disp.display(image)
+```
+
+### 6. 运行脚本
+
+将上述 Python 脚本保存为 `hello_world.py`，然后在命令行中运行：
+
+```bash
+python3 hello_world.py
+```
+
+### 7. 验证显示
+
+运行脚本后，ST7735 屏幕应该会显示 "Hello World" 这几个字。如果一切正常，这意味着你成功地在树莓派 3B 上驱动了 ST7735 显示屏并显示了文本。
+
+### 总结
+
+通过这些步骤，你可以在树莓派 3B 上成功驱动 ST7735 LCD 屏幕，并在屏幕上显示 "Hello World"。你可以进一步定制显示的内容或创建更复杂的图形界面来适应你的项目需求。
+————————————————
+
+                            版权声明：本文为博主原创文章，遵循 CC 4.0 BY-SA 版权协议，转载请附上原文出处链接和本声明。
+                        
+原文链接：https://blog.csdn.net/fanged/article/details/141691761

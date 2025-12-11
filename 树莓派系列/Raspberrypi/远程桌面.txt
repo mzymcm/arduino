@@ -1,0 +1,7 @@
+sudo apt-get install xrdp
+
+使用 PIXEL 桌面环境，可以尝试运行以下命令
+sudo apt-get install --reinstall raspberrypi-ui-mods
+
+sudo apt-get remove xrdp vnc4server tightvncserver
+sudo apt-get install xrdp
