@@ -1,0 +1,767 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <WebSocketsServer.h>
+
+// WiFi配置
+const char* ssid = "RPi_Debugger";  // AP模式名称
+const char* password = "12345678m";  // AP模式密码
+
+// Web服务器和WebSocket
+ESP8266WebServer server(80);
+WebSocketsServer webSocket = WebSocketsServer(81);
+
+// 串口配置
+#define SERIAL_BAUD_RATE 115200
+String serialBuffer = "";
+unsigned long lastSerialReadTime = 0;
+
+// 显示模式
+bool showControlChars = true;  // 是否显示控制字符
+
+void setup() {
+  // 初始化串口
+  Serial.begin(SERIAL_BAUD_RATE);
+  Serial.setTimeout(10);
+  
+  // 等待串口稳定
+  delay(1000);
+  
+  // 设置ESP01为AP模式
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
+  
+  // 获取IP地址
+  IPAddress myIP = WiFi.softAPIP();
+  
+  // 设置Web服务器路由
+  server.on("/", handleRoot);
+  server.on("/send", HTTP_GET, handleSend);
+  server.on("/clear", HTTP_GET, handleClear);
+  server.on("/settings", HTTP_GET, handleSettings);
+  server.on("/saveSettings", HTTP_POST, handleSaveSettings);
+  server.on("/reboot", HTTP_GET, handleReboot);
+  server.on("/toggleControlChars", HTTP_GET, handleToggleControlChars);
+  
+  // 开始Web服务器
+  server.begin();
+  
+  // 开始WebSocket服务器
+  webSocket.begin();
+  webSocket.onEvent(webSocketEvent);
+  
+  Serial.println("\nESP01串口调试工具已启动");
+  Serial.print("AP IP地址: ");
+  Serial.println(myIP);
+}
+
+void loop() {
+  server.handleClient();
+  webSocket.loop();
+  
+  // 读取串口数据
+  readSerialData();
+}
+
+// 网页主界面
+void handleRoot() {
+  String html = R"=====(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>树莓派串口调试工具</title>
+    <style>
+        body { 
+            font-family: 'Consolas', 'Monaco', monospace; 
+            margin: 20px; 
+            background: #f5f5f5;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { 
+            color: #333; 
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .control-panel { 
+            background: #f9f9f9; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin-bottom: 20px;
+        }
+        textarea { 
+            width: 100%; 
+            height: 200px; 
+            font-family: monospace; 
+            padding: 10px; 
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        input[type="text"] {
+            width: 70%; 
+            padding: 10px; 
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button { 
+            padding: 10px 20px; 
+            background: #4CAF50; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-size: 14px;
+            margin: 2px;
+        }
+        button:hover { background: #45a049; }
+        .btn-group button { margin-right: 10px; margin-top: 10px; }
+        .status { 
+            background: #e8f5e9; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin-top: 10px;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+        }
+        .console { 
+            background: #000; 
+            color: #0f0; 
+            font-family: 'Consolas', 'Monaco', monospace; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.3;
+        }
+        .timestamp { color: #888; }
+        .tx { color: #64b5f6; }
+        .rx { color: #81c784; }
+        .control-char { color: #ff9800; background: #333; padding: 0 2px; border-radius: 2px; }
+        .hex-view { color: #9c27b0; }
+        .settings { display: none; background: #f0f7ff; padding: 15px; border-radius: 5px; margin-top: 20px; }
+        .settings-form label { display: block; margin: 10px 0 5px; }
+        .settings-form input { width: 100px; padding: 5px; }
+        .mode-btn { background: #607d8b; }
+        .mode-btn.active { background: #2196f3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>树莓派串口调试工具</h1>
+        
+        <div class="status" id="status">
+            状态: 等待连接 | IP: )=====";
+  html += WiFi.softAPIP().toString();
+  html += R"=====( | 波特率: <span id="baudRate">115200</span> | 
+            显示模式: <button class="mode-btn" onclick="toggleDisplayMode()" id="displayModeBtn">原始模式</button>
+            <button class="mode-btn" onclick="toggleControlChars()" id="controlCharsBtn">显示控制字符</button>
+        </div>
+        
+        <div class="control-panel">
+            <input type="text" id="commandInput" placeholder="输入串口指令..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendCommand()">发送</button>
+            <button onclick="sendNewline()">发送(带换行)</button>
+            <button onclick="sendHex()">发送HEX</button>
+            
+            <div class="btn-group">
+                <button onclick="clearConsole()">清空显示</button>
+                <button onclick="toggleSettings()">设置</button>
+                <button onclick="rebootESP()">重启ESP</button>
+                <button onclick="exportLog()">导出日志</button>
+            </div>
+            
+            <div class="settings" id="settingsPanel">
+                <h3>串口设置</h3>
+                <form class="settings-form" onsubmit="saveSettings(); return false;">
+                    <label>波特率:</label>
+                    <select id="baudSelect">
+                        <option value="9600">9600</option>
+                        <option value="19200">19200</option>
+                        <option value="38400">38400</option>
+                        <option value="57600">57600</option>
+                        <option value="115200" selected>115200</option>
+                        <option value="230400">230400</option>
+                        <option value="460800">460800</option>
+                        <option value="921600">921600</option>
+                    </select>
+                    
+                    <label>换行符:</label>
+                    <select id="newlineSelect">
+                        <option value="none">无</option>
+                        <option value="cr">CR (\r)</option>
+                        <option value="lf">LF (\n)</option>
+                        <option value="crlf" selected>CR+LF (\r\n)</option>
+                    </select>
+                    
+                    <button type="submit">保存设置</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="console" id="console"></div>
+        
+        <div style="margin-top: 20px;">
+            <h3>快捷命令</h3>
+            <button onclick="quickCommand('ls')">ls</button>
+            <button onclick="quickCommand('pwd')">pwd</button>
+            <button onclick="quickCommand('uname -a')">uname -a</button>
+            <button onclick="quickCommand('vcgencmd measure_temp')">温度</button>
+            <button onclick="quickCommand('free -h')">内存</button>
+            <button onclick="quickCommand('uptime')">运行时间</button>
+            <button onclick="quickCommand('ifconfig')">网络</button>
+            <button onclick="quickCommand('')">空行</button>
+        </div>
+    </div>
+    
+    <script>
+        var ws = null;
+        var consoleElement = document.getElementById('console');
+        var commandHistory = [];
+        var historyIndex = -1;
+        var currentCommand = '';
+        var displayMode = 'raw'; // 'raw' or 'hex'
+        var showControlChars = true;
+        
+        function connectWebSocket() {
+            ws = new WebSocket('ws://' + window.location.hostname + ':81/');
+            
+            ws.onopen = function() {
+                updateStatus('WebSocket已连接');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    var data = JSON.parse(event.data);
+                    
+                    if(data.type === 'serial') {
+                        if(displayMode === 'hex') {
+                            displayHexData(data.data);
+                        } else {
+                            displayRawData(data.data);
+                        }
+                    } else if(data.type === 'status') {
+                        updateStatus(data.data);
+                    } else if(data.type === 'mode_changed') {
+                        showControlChars = data.showControlChars;
+                        document.getElementById('controlCharsBtn').innerText = 
+                            showControlChars ? '隐藏控制字符' : '显示控制字符';
+                    }
+                } catch(e) {
+                    console.error('JSON解析错误:', e);
+                    // 如果不是JSON，直接显示
+                    addToConsole(event.data, 'rx');
+                }
+            };
+            
+            ws.onclose = function() {
+                updateStatus('WebSocket断开连接，5秒后重连...');
+                setTimeout(connectWebSocket, 5000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket错误:', error);
+            };
+        }
+        
+        function displayRawData(data) {
+            var timestamp = new Date().toLocaleTimeString();
+            var entry = document.createElement('div');
+            
+            // 处理原始数据，保持原样显示
+            var displayText = '';
+            for(var i = 0; i < data.length; i++) {
+                var charCode = data.charCodeAt(i);
+                
+                if(showControlChars) {
+                    // 显示控制字符的可视化表示
+                    switch(charCode) {
+                        case 0: displayText += '<span class="control-char">[NUL]</span>'; break;
+                        case 10: displayText += '<span class="control-char">[LF]</span>\n'; break;
+                        case 13: displayText += '<span class="control-char">[CR]</span>'; break;
+                        case 9: displayText += '<span class="control-char">[TAB]</span>'; break;
+                        case 27: displayText += '<span class="control-char">[ESC]</span>'; break;
+                        case 8: displayText += '<span class="control-char">[BS]</span>'; break;
+                        case 127: displayText += '<span class="control-char">[DEL]</span>'; break;
+                        default:
+                            if(charCode < 32) {
+                                displayText += '<span class="control-char">[' + charCode.toString(16).toUpperCase().padStart(2, '0') + ']</span>';
+                            } else {
+                                displayText += data.charAt(i);
+                            }
+                    }
+                } else {
+                    // 不显示控制字符，转换为可见字符
+                    if(charCode >= 32 && charCode != 127) {
+                        displayText += data.charAt(i);
+                    } else if(charCode == 10) {
+                        displayText += '\n';
+                    } else if(charCode == 13) {
+                        // 忽略CR
+                    } else {
+                        displayText += ' ';
+                    }
+                }
+            }
+            
+            entry.innerHTML = '<span class="timestamp">[' + timestamp + ']</span> <span class="rx">' + displayText + '</span>';
+            consoleElement.appendChild(entry);
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+        
+        function displayHexData(data) {
+            var timestamp = new Date().toLocaleTimeString();
+            var entry = document.createElement('div');
+            var hexText = '';
+            var asciiText = '';
+            
+            for(var i = 0; i < data.length; i++) {
+                var charCode = data.charCodeAt(i);
+                hexText += charCode.toString(16).toUpperCase().padStart(2, '0') + ' ';
+                
+                if(charCode >= 32 && charCode < 127) {
+                    asciiText += data.charAt(i);
+                } else {
+                    asciiText += '.';
+                }
+                
+                if((i + 1) % 16 == 0) {
+                    hexText += '<br>';
+                    asciiText += '<br>';
+                }
+            }
+            
+            entry.innerHTML = '<span class="timestamp">[' + timestamp + ']</span><br>' +
+                             '<span class="hex-view">' + hexText + '</span><br>' +
+                             '<span class="rx">' + asciiText + '</span>';
+            consoleElement.appendChild(entry);
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+        
+        function addToConsole(text, type) {
+            var timestamp = new Date().toLocaleTimeString();
+            var className = type === 'tx' ? 'tx' : 'rx';
+            var prefix = type === 'tx' ? '>> ' : '<< ';
+            
+            var entry = document.createElement('div');
+            entry.innerHTML = '<span class="timestamp">[' + timestamp + ']</span> <span class="' + className + '">' + prefix + text + '</span>';
+            consoleElement.appendChild(entry);
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+        
+        function sendCommand() {
+            if(!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('WebSocket未连接');
+                return;
+            }
+            
+            var input = document.getElementById('commandInput');
+            var command = input.value;
+            
+            if(command) {
+                addToConsole(command, 'tx');
+                ws.send(JSON.stringify({type: 'command', data: command}));
+                
+                // 保存到历史记录
+                commandHistory.unshift(command);
+                if(commandHistory.length > 50) commandHistory.pop();
+                historyIndex = -1;
+                
+                input.value = '';
+                input.focus();
+            }
+        }
+        
+        function sendNewline() {
+            if(!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('WebSocket未连接');
+                return;
+            }
+            
+            var input = document.getElementById('commandInput');
+            var command = input.value;
+            
+            if(command) {
+                addToConsole(command + ' [带换行]', 'tx');
+                ws.send(JSON.stringify({type: 'command_newline', data: command}));
+                
+                commandHistory.unshift(command);
+                if(commandHistory.length > 50) commandHistory.pop();
+                historyIndex = -1;
+                
+                input.value = '';
+                input.focus();
+            }
+        }
+        
+        function sendHex() {
+            if(!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('WebSocket未连接');
+                return;
+            }
+            
+            var input = document.getElementById('commandInput');
+            var hexStr = input.value.replace(/\s+/g, '');
+            
+            if(hexStr && /^[0-9A-Fa-f]+$/.test(hexStr)) {
+                var bytes = [];
+                for(var i = 0; i < hexStr.length; i += 2) {
+                    bytes.push(parseInt(hexStr.substr(i, 2), 16));
+                }
+                
+                var binaryStr = String.fromCharCode.apply(null, bytes);
+                var timestamp = new Date().toLocaleTimeString();
+                var entry = document.createElement('div');
+                entry.innerHTML = '<span class="timestamp">[' + timestamp + ']</span> <span class="tx">>> [HEX] ' + hexStr.toUpperCase() + '</span>';
+                consoleElement.appendChild(entry);
+                consoleElement.scrollTop = consoleElement.scrollHeight;
+                
+                ws.send(JSON.stringify({type: 'command_hex', data: binaryStr}));
+                
+                input.value = '';
+                input.focus();
+            } else {
+                alert('请输入有效的HEX字符串（如：48656C6C6F）');
+            }
+        }
+        
+        function quickCommand(cmd) {
+            document.getElementById('commandInput').value = cmd;
+            if(cmd === '') {
+                sendNewline();
+            } else {
+                sendNewline();
+            }
+        }
+        
+        function clearConsole() {
+            consoleElement.innerHTML = '';
+        }
+        
+        function updateStatus(text) {
+            document.getElementById('status').innerHTML = '状态: ' + text + ' | IP: )=====";
+  html += WiFi.softAPIP().toString();
+  html += R"=====( | 波特率: <span id="baudRate">115200</span> | 显示模式: ' +
+                '<button class="mode-btn" onclick="toggleDisplayMode()" id="displayModeBtn">' + 
+                (displayMode === 'raw' ? '原始模式' : 'HEX模式') + '</button> ' +
+                '<button class="mode-btn" onclick="toggleControlChars()" id="controlCharsBtn">' + 
+                (showControlChars ? '隐藏控制字符' : '显示控制字符') + '</button>';
+        }
+        
+        function toggleSettings() {
+            var panel = document.getElementById('settingsPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function toggleDisplayMode() {
+            displayMode = displayMode === 'raw' ? 'hex' : 'raw';
+            document.getElementById('displayModeBtn').innerText = 
+                displayMode === 'raw' ? '原始模式' : 'HEX模式';
+            updateStatus('显示模式已切换');
+        }
+        
+        function toggleControlChars() {
+            if(!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('WebSocket未连接');
+                return;
+            }
+            
+            showControlChars = !showControlChars;
+            ws.send(JSON.stringify({
+                type: 'toggle_control_chars'
+            }));
+        }
+        
+        function saveSettings() {
+            if(!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('WebSocket未连接');
+                return;
+            }
+            
+            var baudRate = document.getElementById('baudSelect').value;
+            var newline = document.getElementById('newlineSelect').value;
+            
+            ws.send(JSON.stringify({
+                type: 'settings',
+                baudRate: baudRate,
+                newline: newline
+            }));
+            
+            document.getElementById('baudRate').innerText = baudRate;
+            toggleSettings();
+        }
+        
+        function rebootESP() {
+            if(confirm('确定要重启ESP01吗？')) {
+                fetch('/reboot').then(() => {
+                    updateStatus('正在重启...');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 3000);
+                });
+            }
+        }
+        
+        function exportLog() {
+            var logText = consoleElement.innerText;
+            var blob = new Blob([logText], {type: 'text/plain'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'serial_debug_' + new Date().toISOString().slice(0,10) + '.log';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function handleKeyPress(e) {
+            if(e.key === 'Enter') {
+                if(e.ctrlKey) {
+                    sendHex();
+                } else if(e.shiftKey) {
+                    sendNewline();
+                } else {
+                    sendCommand();
+                }
+                e.preventDefault();
+            } else if(e.key === 'ArrowUp') {
+                e.preventDefault();
+                if(historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    document.getElementById('commandInput').value = commandHistory[historyIndex];
+                }
+            } else if(e.key === 'ArrowDown') {
+                e.preventDefault();
+                if(historyIndex > 0) {
+                    historyIndex--;
+                    document.getElementById('commandInput').value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = -1;
+                    document.getElementById('commandInput').value = currentCommand;
+                }
+            }
+        }
+        
+        // 初始化
+        window.onload = function() {
+            document.getElementById('commandInput').focus();
+            connectWebSocket();
+        };
+    </script>
+</body>
+</html>
+)=====";
+  
+  server.send(200, "text/html", html);
+}
+
+// 处理发送命令
+void handleSend() {
+  if (server.hasArg("command")) {
+    String command = server.arg("command");
+    command.replace("\\n", "\n");
+    command.replace("\\r", "\r");
+    
+    Serial.print(command);
+    server.send(200, "text/plain", "命令已发送: " + command);
+  } else {
+    server.send(400, "text/plain", "无效请求");
+  }
+}
+
+void handleClear() {
+  serialBuffer = "";
+  server.send(200, "text/plain", "缓冲区已清空");
+}
+
+void handleSettings() {
+  String html = "<h1>串口设置</h1>";
+  html += "<form action='/saveSettings' method='POST'>";
+  html += "波特率: <input type='number' name='baud' value='115200'><br>";
+  html += "<input type='submit' value='保存'>";
+  html += "</form>";
+  server.send(200, "text/html", html);
+}
+
+void handleSaveSettings() {
+  if (server.hasArg("baud")) {
+    long newBaud = server.arg("baud").toInt();
+    Serial.end();
+    Serial.begin(newBaud);
+    server.send(200, "text/plain", "波特率已设置为: " + String(newBaud));
+  }
+}
+
+void handleReboot() {
+  server.send(200, "text/plain", "ESP01正在重启...");
+  delay(1000);
+  ESP.restart();
+}
+
+void handleToggleControlChars() {
+  showControlChars = !showControlChars;
+  String jsonMsg = "{\"type\":\"mode_changed\",\"showControlChars\":" + 
+                   String(showControlChars ? "true" : "false") + "}";
+  webSocket.broadcastTXT(jsonMsg);
+  server.send(200, "text/plain", "控制字符显示: " + String(showControlChars ? "开启" : "关闭"));
+}
+
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
+  switch(type) {
+    case WStype_DISCONNECTED:
+      break;
+      
+    case WStype_CONNECTED: {
+      IPAddress ip = webSocket.remoteIP(num);
+      String msg = "已连接客户端: " + String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
+      Serial.println(msg);
+      
+      // 发送当前模式状态
+      String modeMsg = "{\"type\":\"mode_changed\",\"showControlChars\":" + 
+                      String(showControlChars ? "true" : "false") + "}";
+      webSocket.sendTXT(num, modeMsg);
+      break;
+    }
+      
+    case WStype_TEXT: {
+      String text = String((char*)payload);
+      
+      // 解析JSON
+      if(text.indexOf("\"type\":\"command\"") > -1) {
+        // 提取命令
+        int start = text.indexOf("\"data\":\"") + 8;
+        int end = text.indexOf("\"", start);
+        if(start > 7 && end > start) {
+          String command = text.substring(start, end);
+          // 处理转义字符
+          command.replace("\\\\", "\\");
+          command.replace("\\n", "\n");
+          command.replace("\\r", "\r");
+          command.replace("\\t", "\t");
+          command.replace("\\\"", "\"");
+          
+          Serial.print(command);
+          
+          String statusMsg = "{\"type\":\"status\",\"data\":\"命令已发送\"}";
+          webSocket.sendTXT(num, statusMsg);
+        }
+      }
+      else if(text.indexOf("\"type\":\"command_newline\"") > -1) {
+        int start = text.indexOf("\"data\":\"") + 8;
+        int end = text.indexOf("\"", start);
+        if(start > 7 && end > start) {
+          String command = text.substring(start, end);
+          command.replace("\\\\", "\\");
+          command.replace("\\n", "\n");
+          command.replace("\\r", "\r");
+          command.replace("\\t", "\t");
+          command.replace("\\\"", "\"");
+          
+          Serial.println(command);
+          
+          String statusMsg = "{\"type\":\"status\",\"data\":\"命令已发送(带换行)\"}";
+          webSocket.sendTXT(num, statusMsg);
+        }
+      }
+      else if(text.indexOf("\"type\":\"command_hex\"") > -1) {
+        int start = text.indexOf("\"data\":\"") + 8;
+        int end = text.indexOf("\"", start);
+        if(start > 7 && end > start) {
+          String command = text.substring(start, end);
+          // HEX命令不进行转义，直接发送原始二进制数据
+          Serial.print(command);
+          
+          String statusMsg = "{\"type\":\"status\",\"data\":\"HEX命令已发送\"}";
+          webSocket.sendTXT(num, statusMsg);
+        }
+      }
+      else if(text.indexOf("\"type\":\"settings\"") > -1) {
+        // 解析设置
+        int baudStart = text.indexOf("\"baudRate\":\"") + 12;
+        int baudEnd = text.indexOf("\"", baudStart);
+        String baudStr = text.substring(baudStart, baudEnd);
+        long newBaud = baudStr.toInt();
+        
+        if(newBaud >= 300 && newBaud <= 2000000) {
+          Serial.end();
+          delay(100);
+          Serial.begin(newBaud);
+          delay(100);
+          
+          String statusMsg = "{\"type\":\"status\",\"data\":\"波特率已设置为" + String(newBaud) + "\"}";
+          webSocket.sendTXT(num, statusMsg);
+        }
+      }
+      else if(text.indexOf("\"type\":\"toggle_control_chars\"") > -1) {
+        showControlChars = !showControlChars;
+        String modeMsg = "{\"type\":\"mode_changed\",\"showControlChars\":" + 
+                        String(showControlChars ? "true" : "false") + "}";
+        webSocket.broadcastTXT(modeMsg);
+      }
+      break;
+    }
+  }
+}
+
+void readSerialData() {
+  static String tempBuffer = "";
+  static unsigned long lastSendTime = 0;
+  
+  while (Serial.available()) {
+    char c = Serial.read();
+    tempBuffer += c;
+    
+    lastSerialReadTime = millis();
+  }
+  
+  // 每50ms发送一次数据，或者缓冲区达到256字节
+  if ((tempBuffer.length() > 0 && millis() - lastSerialReadTime > 50) || tempBuffer.length() >= 256) {
+    if (tempBuffer.length() > 0) {
+      // 构建JSON字符串
+      String jsonData = "{\"type\":\"serial\",\"data\":\"";
+      
+      // 转义特殊字符
+      for (unsigned int i = 0; i < tempBuffer.length(); i++) {
+        char c = tempBuffer.charAt(i);
+        
+        // 转义JSON特殊字符
+        switch (c) {
+          case '\\': jsonData += "\\\\"; break;
+          case '\"': jsonData += "\\\""; break;
+          case '\n': jsonData += "\\n"; break;
+          case '\r': jsonData += "\\r"; break;
+          case '\t': jsonData += "\\t"; break;
+          case '\b': jsonData += "\\b"; break;
+          case '\f': jsonData += "\\f"; break;
+          default:
+            // 对于其他控制字符，使用Unicode转义
+            if (c < 32 || c > 126) {
+              char hex[7];
+              sprintf(hex, "\\u%04x", (int)c);
+              jsonData += hex;
+            } else {
+              jsonData += c;
+            }
+        }
+      }
+      
+      jsonData += "\"}";
+      
+      // 发送数据
+      webSocket.broadcastTXT(jsonData);
+      tempBuffer = "";
+      lastSendTime = millis();
+    }
+  }
+}
