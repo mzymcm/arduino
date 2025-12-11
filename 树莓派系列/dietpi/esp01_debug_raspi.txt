@@ -17,6 +17,54 @@ unsigned long lastSerialReadTime = 0;
 
 // 显示模式
 bool showControlChars = true;  // 是否显示控制字符
+bool filterAnsiCodes = true;   // 是否过滤ANSI转义码
+
+// 字符串处理函数
+String filterAnsiEscapeCodes(String input) {
+  String output = "";
+  bool inEscape = false;
+  bool inBracket = false;
+  
+  for (unsigned int i = 0; i < input.length(); i++) {
+    char c = input.charAt(i);
+    
+    // 检测ANSI转义序列开始 (ESC [)
+    if (c == 0x1B && i + 1 < input.length() && input.charAt(i + 1) == '[') {
+      inEscape = true;
+      inBracket = true;
+      i++; // 跳过'['
+      continue;
+    }
+    
+    // 如果正在处理转义序列
+    if (inEscape) {
+      // 检查序列结束字符 (字母)
+      if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '@') {
+        inEscape = false;
+        inBracket = false;
+      }
+      continue;
+    }
+    
+    // 处理特殊字符
+    if (c >= 0xC0 && c <= 0xDF && i + 1 < input.length()) {
+      // UTF-8双字节字符（如方块字符）
+      char c2 = input.charAt(i + 1);
+      if ((c == 0xE2 && c2 == 0x94) || 
+          (c == 0xC3 && c2 == 0xA2)) {
+        // 将方块字符转换为短横线
+        output += '-';
+        i++; // 跳过第二个字节
+        continue;
+      }
+    }
+    
+    // 添加正常字符
+    output += c;
+  }
+  
+  return output;
+}
 
 void setup() {
   // 初始化串口
@@ -41,6 +89,7 @@ void setup() {
   server.on("/saveSettings", HTTP_POST, handleSaveSettings);
   server.on("/reboot", HTTP_GET, handleReboot);
   server.on("/toggleControlChars", HTTP_GET, handleToggleControlChars);
+  server.on("/toggleAnsiFilter", HTTP_GET, handleToggleAnsiFilter);
   
   // 开始Web服务器
   server.begin();
@@ -78,7 +127,7 @@ void handleRoot() {
             background: #f5f5f5;
         }
         .container { 
-            max-width: 900px; 
+            max-width:80%; 
             margin: 0 auto; 
             background: white; 
             padding: 20px; 
@@ -86,9 +135,11 @@ void handleRoot() {
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         h1 { 
-            color: #333; 
+            color: #333;
             border-bottom: 2px solid #4CAF50;
             padding-bottom: 10px;
+            font-family: none;
+            text-align: center;
         }
         .control-panel { 
             background: #f9f9f9; 
@@ -168,6 +219,7 @@ void handleRoot() {
   html += R"=====( | 波特率: <span id="baudRate">115200</span> | 
             显示模式: <button class="mode-btn" onclick="toggleDisplayMode()" id="displayModeBtn">原始模式</button>
             <button class="mode-btn" onclick="toggleControlChars()" id="controlCharsBtn">显示控制字符</button>
+            <button class="mode-btn" onclick="toggleAnsiFilter()" id="ansiFilterBtn">过滤ANSI</button>
         </div>
         
         <div class="control-panel">
@@ -234,6 +286,7 @@ void handleRoot() {
         var currentCommand = '';
         var displayMode = 'raw'; // 'raw' or 'hex'
         var showControlChars = true;
+        var filterAnsi = true;
         
         function connectWebSocket() {
             ws = new WebSocket('ws://' + window.location.hostname + ':81/');
@@ -258,6 +311,10 @@ void handleRoot() {
                         showControlChars = data.showControlChars;
                         document.getElementById('controlCharsBtn').innerText = 
                             showControlChars ? '隐藏控制字符' : '显示控制字符';
+                    } else if(data.type === 'ansi_filter_changed') {
+                        filterAnsi = data.filterAnsi;
+                        document.getElementById('ansiFilterBtn').innerText = 
+                            filterAnsi ? '不过滤ANSI' : '过滤ANSI';
                     }
                 } catch(e) {
                     console.error('JSON解析错误:', e);
@@ -280,7 +337,7 @@ void handleRoot() {
             var timestamp = new Date().toLocaleTimeString();
             var entry = document.createElement('div');
             
-            // 处理原始数据，保持原样显示
+            // 处理原始数据
             var displayText = '';
             for(var i = 0; i < data.length; i++) {
                 var charCode = data.charCodeAt(i);
@@ -457,7 +514,9 @@ void handleRoot() {
                 '<button class="mode-btn" onclick="toggleDisplayMode()" id="displayModeBtn">' + 
                 (displayMode === 'raw' ? '原始模式' : 'HEX模式') + '</button> ' +
                 '<button class="mode-btn" onclick="toggleControlChars()" id="controlCharsBtn">' + 
-                (showControlChars ? '隐藏控制字符' : '显示控制字符') + '</button>';
+                (showControlChars ? '隐藏控制字符' : '显示控制字符') + '</button> ' +
+                '<button class="mode-btn" onclick="toggleAnsiFilter()" id="ansiFilterBtn">' + 
+                (filterAnsi ? '不过滤ANSI' : '过滤ANSI') + '</button>';
         }
         
         function toggleSettings() {
@@ -478,9 +537,19 @@ void handleRoot() {
                 return;
             }
             
-            showControlChars = !showControlChars;
             ws.send(JSON.stringify({
                 type: 'toggle_control_chars'
+            }));
+        }
+        
+        function toggleAnsiFilter() {
+            if(!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('WebSocket未连接');
+                return;
+            }
+            
+            ws.send(JSON.stringify({
+                type: 'toggle_ansi_filter'
             }));
         }
         
@@ -617,6 +686,14 @@ void handleToggleControlChars() {
   server.send(200, "text/plain", "控制字符显示: " + String(showControlChars ? "开启" : "关闭"));
 }
 
+void handleToggleAnsiFilter() {
+  filterAnsiCodes = !filterAnsiCodes;
+  String jsonMsg = "{\"type\":\"ansi_filter_changed\",\"filterAnsi\":" + 
+                   String(filterAnsiCodes ? "true" : "false") + "}";
+  webSocket.broadcastTXT(jsonMsg);
+  server.send(200, "text/plain", "ANSI过滤: " + String(filterAnsiCodes ? "开启" : "关闭"));
+}
+
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
     case WStype_DISCONNECTED:
@@ -631,6 +708,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       String modeMsg = "{\"type\":\"mode_changed\",\"showControlChars\":" + 
                       String(showControlChars ? "true" : "false") + "}";
       webSocket.sendTXT(num, modeMsg);
+      
+      String ansiMsg = "{\"type\":\"ansi_filter_changed\",\"filterAnsi\":" + 
+                      String(filterAnsiCodes ? "true" : "false") + "}";
+      webSocket.sendTXT(num, ansiMsg);
       break;
     }
       
@@ -709,6 +790,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                         String(showControlChars ? "true" : "false") + "}";
         webSocket.broadcastTXT(modeMsg);
       }
+      else if(text.indexOf("\"type\":\"toggle_ansi_filter\"") > -1) {
+        filterAnsiCodes = !filterAnsiCodes;
+        String ansiMsg = "{\"type\":\"ansi_filter_changed\",\"filterAnsi\":" + 
+                        String(filterAnsiCodes ? "true" : "false") + "}";
+        webSocket.broadcastTXT(ansiMsg);
+      }
       break;
     }
   }
@@ -728,12 +815,18 @@ void readSerialData() {
   // 每50ms发送一次数据，或者缓冲区达到256字节
   if ((tempBuffer.length() > 0 && millis() - lastSerialReadTime > 50) || tempBuffer.length() >= 256) {
     if (tempBuffer.length() > 0) {
+      // 过滤ANSI转义码
+      String processedData = tempBuffer;
+      if (filterAnsiCodes) {
+        processedData = filterAnsiEscapeCodes(processedData);
+      }
+      
       // 构建JSON字符串
       String jsonData = "{\"type\":\"serial\",\"data\":\"";
       
       // 转义特殊字符
-      for (unsigned int i = 0; i < tempBuffer.length(); i++) {
-        char c = tempBuffer.charAt(i);
+      for (unsigned int i = 0; i < processedData.length(); i++) {
+        char c = processedData.charAt(i);
         
         // 转义JSON特殊字符
         switch (c) {
