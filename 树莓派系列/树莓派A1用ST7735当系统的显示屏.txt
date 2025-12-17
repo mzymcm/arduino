@@ -316,6 +316,33 @@ WantedBy=multi-user.target
 
 ####=========    st7735-fb.service  end =========####
 
+
+####=========  如果想更快的显示启动过程，可用这个 =========####
+[Unit]
+Description=ST7735 User-space Framebuffer Driver
+# 系统初始化完成就启动
+After=sysinit.target
+# 确保必要的设备可用
+# 确保SPI/I2C设备可用（根据实际硬件）
+Requires=dev-spidev0.0.device
+
+DefaultDependencies=no  # 跳过默认依赖，可以更早启动
+
+[Service]
+Type=simple
+ExecStart=/root/go_run/st7735/st7735_fb
+WorkingDirectory=/root/go_run/st7735
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=sysinit.target
+
+####==================####
+
+
+
 5. 创建控制台重定向脚本
 创建 /usr/local/bin/console-to-st7735.sh：
 
@@ -365,3 +392,10 @@ echo "/usr/local/bin/console-to-st7735.sh" >> /etc/rc.local
 # 给脚本执行权限
 chmod +x /usr/local/bin/console-to-st7735.sh
 chmod +x /etc/rc.local
+
+
+
+如果修改了，就执行以下：
+重新加载 systemd 配置：sudo systemctl daemon-reload
+启用服务：sudo systemctl enable st7735-fb.service
+启动服务：sudo systemctl start st7735-fb.service
