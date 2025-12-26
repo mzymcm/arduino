@@ -1,0 +1,39 @@
+======================  
+====   nano minimal_vnc.sh
+====   chmod +x minimal_vnc.sh
+====    sudo ./minimal_vnc.sh
+======================  
+
+
+#!/bin/bash
+# minimal_vnc.sh
+
+# 停止现有VNC
+vncserver -kill :2 2>/dev/null
+
+# 创建极简xstartup
+cat > /tmp/minimal_xstartup << 'EOF'
+#!/bin/bash
+# 基本环境设置
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+
+# 设置背景
+xsetroot -solid "#2C2C2C"
+
+# 启动一个简单的终端
+xterm -geometry 100x40+50+50 -bg black -fg white -title "AidLux Terminal" &
+
+# 保持会话运行
+while true; do
+    sleep 3600
+done
+EOF
+
+chmod +x /tmp/minimal_xstartup
+
+# 启动VNC
+vncserver :2 -geometry 1024x768 -depth 16 -localhost no -xstartup /tmp/minimal_xstartup
+
+echo "Minimal VNC started on :2"
+echo "Connect with: vncviewer localhost:2"
