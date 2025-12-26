@@ -1,0 +1,122 @@
+#!/bin/bash
+
+APP_HOME="/opt/aidlux/app/ubuntu-desktop"
+PROCESS_NAME="Xtigervnc"
+cd /home/aidlux
+
+function start() {
+    local pid=$(ps -ef | grep -v grep | grep -v "${PROCESS_NAME}.sh" | grep -v tail | grep "${PROCESS_NAME}" | awk '{print $2}')
+    if [[ -n ${pid} ]]; then
+        echo "has started at pid : ${pid}"
+        exit 0
+    fi
+
+    # remove lock file
+    if [[ -e "/tmp/.X2-lock" ]]; then
+        rm -rf /tmp/.X2-lock
+    fi
+    if [[ -e "/tmp/.X11-unix/X2" ]]; then
+        rm -rf /tmp/.X11-unix/X2
+    fi
+
+    vncserver -kill :2
+    export XKL_XMODMAP_DISABLE=1
+    export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg
+    export GNOME_SHELL_SESSION_MODE=ubuntu
+    export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+    export XDG_SESSION_TYPE=x11
+    export DISPLAY=:2
+    sudo /bin/systemctl stop gdm
+    sleep 2
+
+    tigervncserver -localhost no -geometry 1280x768 :2
+    #env DISPLAY=:2 gnome-session >/dev/null 2>&1 &
+
+    # nohup ${PROCESS_NAME} -i 127.0.0.1 -p 8081 -t renderType=canvas -u $(id aidlux -u) -g $(id aidlux -g) bash >/dev/null 2>&1 &
+    sleep 1
+
+    pid=$(ps -ef | grep -v grep | grep -v "${PROCESS_NAME}.sh" | grep -v tail | grep "${PROCESS_NAME}" | awk '{print $2}')
+
+    local count=0
+
+    if [[ -z "${pid}" ]]; then
+        while ((count >= 15)); do
+            pid=$(ps -ef | grep -v grep | grep -v "${PROCESS_NAME}.sh" | grep -v tail | grep "${PROCESS_NAME}" | awk '{print $2}')
+            if [[ -n ${pid} ]]; then
+                echo "started with pid : ${pid}"
+            fi
+            ((count++))
+            sleep 1
+        done
+        echo "start failed"
+    else
+        echo "started with pid : ${pid}"
+    fi
+}
+
+function stop() {
+    local pid=$(ps -ef | grep -v grep | grep -v "${PROCESS_NAME}.sh" | grep -v tail | grep "${PROCESS_NAME}" | awk '{print $2}')
+    if [[ -n ${pid} ]]; then
+        #send term single
+        kill ${pid}
+        /usr/bin/pkill -f gnome
+        sudo /bin/systemctl start gdm
+
+        #wait for enough time to keep ehcache completed close
+        sleep 3
+
+        while kill -0 ${pid} >/dev/null 2>&1; do
+            if ((count >= 15)); then
+                kill -9 ${pid}
+                echo "After 30 seconds, force kill ${pid}"
+                break
+            fi
+            ((count++))
+            sleep 1
+        done
+    fi
+
+    echo "stopped"
+}
+
+function restart() {
+    stop
+    echo "Restarting after stopping vncserver may fail. Try to wait for resources to be released. If it still fails, try again later."
+    sleep 10
+    start
+}
+
+function main() {
+    local param=""
+    while (($# > 0)); do
+        param=$1
+        case ${param} in
+        "start")
+            start
+            exit $?
+            ;;
+        "restart")
+            restart
+            exit $?
+            ;;
+        "stop")
+            stop
+            exit $?
+            ;;
+        *)
+            echo "Usage $0 <start|stop>"
+            exit 1
+            ;;
+        esac
+    done
+}
+
+if (($# <= 0 || $# > 2)); then
+    echo "Usage $0 <start|stop|restart>"
+    exit 1
+fi
+
+main "$@"
+
+exit 0
+

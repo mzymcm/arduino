@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# AidLux Simple VNC Starter with XFCE4
+# 这个脚本专门用于在AidLux上启动VNC
+
+echo "AidLux VNC Starter"
+echo "=================="
+
+case "$1" in
+    start)
+        echo "Starting VNC server..."
+        
+        # 先停止可能存在的VNC实例
+        vncserver -kill :2 2>/dev/null
+        pkill -f Xtigervnc 2>/dev/null
+        pkill -f Xvnc 2>/dev/null
+        
+        # 清理锁文件
+        rm -f /tmp/.X2-lock 2>/dev/null
+        rm -f /tmp/.X11-unix/X2 2>/dev/null
+        
+        # 检查XFCE4是否安装
+        if [ ! -f /usr/bin/startxfce4 ]; then
+            echo "XFCE4 is not installed. Installing..."
+            sudo apt-get update
+            sudo apt-get install -y xfce4 xfce4-goodies xfce4-terminal
+        fi
+        
+        # 创建简单的xstartup脚本
+        mkdir -p /root/.vnc
+        cat > /root/.vnc/xstartup << 'EOF'
+#!/bin/bash
+unset DBUS_SESSION_BUS_ADDRESS
+unset SESSION_MANAGER
+export XDG_CURRENT_DESKTOP=XFCE
+xrdb "$HOME/.Xresources"
+startxfce4 &
+EOF
+        chmod +x /root/.vnc/xstartup
+        
+        # 设置VNC密码（如果未设置）
+        if [ ! -f /root/.vnc/passwd ] || [ ! -s /root/.vnc/passwd ]; then
+            echo "Please set a VNC password (at least 6 characters):"
+            sudo vncpasswd /root/.vnc/passwd
+        fi
+        
+        # 使用最简参数启动VNC
+        echo "Starting VNC with minimal configuration..."
+        /usr/bin/tigervncserver :2 -geometry 1280x768 -depth 16 -localhost no
+        
+        # 等待并检查
+        sleep 3
+        
+        if [ -f /tmp/.X2-lock ]; then
+            echo ""
+            echo "✅ VNC started successfully!"
+            echo ""
+            echo "Display:     :2"
+            echo "Port:        5902"
+            echo "Log file:    /root/.vnc/localhost:2.log"
+            echo ""
+            echo "To connect:"
+            echo "  vncviewer localhost:2"
+            echo ""
+            echo "Your device IP addresses:"
+            ip addr show | grep inet | grep -v 127.0.0.1 | grep -v ::1 | awk '{print "  " $2}'
+        else
+            echo ""
+            echo "⚠️  VNC may have issues starting"
+            echo "Check the log file for details:"
+            echo "  sudo cat /root/.vnc/localhost:2.log"
+        fi
+        ;;
+    
+    stop)
+        echo "Stopping VNC server..."
+        vncserver -kill :2 2>/dev/null
+        pkill -f Xtigervnc 2>/dev/null
+        pkill -f Xvnc 2>/dev/null
+        rm -f /tmp/.X2-lock 2>/dev/null
+        echo "VNC stopped"
+        ;;
+    
+    status)
+        echo "VNC Status:"
+        if [ -f /tmp/.X2-lock ]; then
+            PID=$(cat /tmp/.X2-lock 2>/dev/null)
+            echo "✅ Running (PID: $PID)"
+            echo "Port 5902: $(netstat -tln 2>/dev/null | grep ':5902' && echo 'Listening' || echo 'Not listening')"
+        else
+            echo "❌ Not running"
+        fi
+        ;;
+    
+    log)
+        if [ -f /root/.vnc/localhost:2.log ]; then
+            echo "Last 30 lines of VNC log:"
+            echo "=========================="
+            tail -30 /root/.vnc/localhost:2.log
+        else
+            echo "Log file not found"
+        fi
+        ;;
+    
+    help|*)
+        echo "Usage: $0 {start|stop|status|log}"
+        echo ""
+        echo "Simple VNC management for AidLux:"
+        echo "  start   - Start VNC server on :2"
+        echo "  stop    - Stop VNC server"
+        echo "  status  - Check VNC status"
+        echo "  log     - Show VNC log"
+        echo ""
+        echo "If VNC fails to start, check:"
+        echo "  1. Install XFCE4: sudo apt-get install xfce4"
+        echo "  2. Check logs: sudo cat /root/.vnc/localhost:2.log"
+        echo "  3. Try manual: vncserver :2 -geometry 1024x768 -depth 24"
+        ;;
+esac
