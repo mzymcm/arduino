@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# 判断第一个参数是否等于 "basic"
+if [ "$1" = "basic" ]; then
+    pkill -f gnome-session
+    sleep 4
+    service dbus start
+    service dbus start
+    export DISPLAY=:1
+    export XKL_XMODMAP_DISABLE=1
+    export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg 
+    export GNOME_SHELL_SESSION_MODE=ubuntu 
+    export XDG_CURRENT_DESKTOP=ubuntu:GNOME 
+    export XDG_SESSION_TYPE=x11 
+    gnome-shell --x11
+    echo "The flavor is 'basic'."
+else
+    cd /home/aidlux
+    systemctl start gdm
+    if [[ -f "/usr/local/bin/aidluxctl" ]]; then
+      /usr/local/bin/aidluxctl start
+    fi
+    
+    if [[ -f "/usr/local/bin/launch-gm" ]]; then
+      export XKL_XMODMAP_DISABLE=1
+      export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg
+      export GNOME_SHELL_SESSION_MODE=ubuntu
+      export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+      export XDG_SESSION_TYPE=x11
+      env DISPLAY=:1 gnome-session >/dev/null 2>&1 &
+      /usr/local/bin/launch-gm
+    else
+      start-xwayland-gnome
+    fi
+fi
+start-xwayland-xfce4
