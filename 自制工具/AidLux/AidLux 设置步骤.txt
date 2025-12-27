@@ -24,6 +24,9 @@ chmod +x /root/.vnc/xstartup
 ===打开 vncserver.sh 找到  export XDG_CURRENT_DESKTOP=ubuntu:GNOME 改为下面的设置保存
 export XDG_CURRENT_DESKTOP=ubuntu:XFCE
 
+如果想再优化一下，将这个也改一下： tigervncserver -localhost no :2 改为下面的。
+sudo /usr/bin/tigervncserver :2 -geometry 1280x768 -localhost no
+
 ===如果手机端的 xwayland 打不开 xfce4 ：打开 start-xwayland.sh 将下面的代码换上即可。
 sudo nano start-xwayland.sh
 ==== start-xwayland.sh 文件内容  开始====
@@ -69,6 +72,14 @@ start-xwayland-xfce4
 
 
 
+
+
+======= XFCE4设置中文界面
+‌sudo apt update && sudo apt install language-pack-zh-hans
+sudo dpkg-reconfigure locales
+选中zh_CN.UTF-8 UTF-8
+sudo apt install fonts-wqy-zenhei
+重启后登录界面和桌面应显示为中文
 
 
 ======= 下面的不用管，是临时修改用的。
