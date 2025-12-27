@@ -1,0 +1,82 @@
+aid-python3 -m pip install --upgrade pip
+===点应用市场，点AidLux，安装Aid-Pkg，更新Terminal和Aid-Desktop
+===点应用市场，点Ubuntu,搜索xfce4 安装
+===点应用市场，点AidLux,安装Ubuntu Desktop
+sudo apt-get install nano
+sudo apt-get install xterm
+cd /opt/aidlux/app/ubuntu-desktop
+sudo cp vncserver.sh vncserver.sh_back
+sudo cp start-xwayland.sh start-xwayland.sh_back
+sudo ./vncserver.sh start
+
+====如果出错：
+
+cat > /root/.vnc/xstartup << 'EOF'
+#!/bin/bash
+unset DBUS_SESSION_BUS_ADDRESS
+unset SESSION_MANAGER
+export XDG_CURRENT_DESKTOP=XFCE
+xrdb "$HOME/.Xresources"
+startxfce4 &
+EOF
+chmod +x /root/.vnc/xstartup
+
+===打开 vncserver.sh 找到  export XDG_CURRENT_DESKTOP=ubuntu:GNOME 改为下面的设置保存
+export XDG_CURRENT_DESKTOP=ubuntu:XFCE
+
+===如果手机端的 xwayland 打不开 xfce4 ：打开 start-xwayland.sh 将下面的代码换上即可。
+sudo nano start-xwayland.sh
+==== start-xwayland.sh 文件内容  开始====
+#!/bin/bash
+# 判断第一个参数是否等于 "basic"
+if [ "$1" = "basic" ]; then
+    pkill -f gnome-session
+    sleep 4
+    service dbus start
+    service dbus start
+    export DISPLAY=:1
+    export XKL_XMODMAP_DISABLE=1
+    export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg 
+    export GNOME_SHELL_SESSION_MODE=ubuntu 
+    export XDG_CURRENT_DESKTOP=ubuntu:GNOME 
+    export XDG_SESSION_TYPE=x11 
+    gnome-shell --x11
+    echo "The flavor is 'basic'."
+else
+    cd /home/aidlux
+    systemctl start gdm
+    if [[ -f "/usr/local/bin/aidluxctl" ]]; then
+      /usr/local/bin/aidluxctl start
+    fi
+    
+    if [[ -f "/usr/local/bin/launch-gm" ]]; then
+      export XKL_XMODMAP_DISABLE=1
+      export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg
+      export GNOME_SHELL_SESSION_MODE=ubuntu
+      export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+      export XDG_SESSION_TYPE=x11
+      env DISPLAY=:1 gnome-session >/dev/null 2>&1 &
+      /usr/local/bin/launch-gm
+    else
+      start-xwayland-gnome
+    fi
+fi
+start-xwayland-xfce4
+
+==== start-xwayland.sh 文件内容  结束====
+
+
+
+
+
+
+
+======= 下面的不用管，是临时修改用的。
+sudo rm ./vncserver.sh
+sudo nano vncserver.sh
+sudo chmod 0755 vncserver.sh
+sudo ./vncserver.sh start
+sudo cp vncserver.sh_back vncserver.sh
+sudo rm ./start-xwayland.sh
+sudo nano start-xwayland.sh
+sudo chmod 0755 start-xwayland.sh
