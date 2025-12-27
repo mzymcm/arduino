@@ -46,7 +46,7 @@ EOF
         
         # 使用最简参数启动VNC
         echo "Starting VNC with minimal configuration..."
-        /usr/bin/tigervncserver :2 -geometry 1280x768 -depth 16 -localhost no
+        /usr/bin/tigervncserver :2 -geometry 1280x768 -localhost no
         
         # 等待并检查
         sleep 3
@@ -114,6 +114,6 @@ EOF
         echo "If VNC fails to start, check:"
         echo "  1. Install XFCE4: sudo apt-get install xfce4"
         echo "  2. Check logs: sudo cat /root/.vnc/localhost:2.log"
-        echo "  3. Try manual: vncserver :2 -geometry 1024x768 -depth 24"
+        echo "  3. Try manual: vncserver :2 -geometry 1024x768"
         ;;
 esac
