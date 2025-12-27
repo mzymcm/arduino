@@ -1,4 +1,6 @@
-======================  
+======================
+====   sudo apt-get install nano
+====   sudo apt-get install xterm  
 ====   nano minimal_vnc.sh
 ====   chmod +x minimal_vnc.sh
 ====    sudo ./minimal_vnc.sh
