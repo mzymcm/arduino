@@ -91,3 +91,12 @@ sudo cp vncserver.sh_back vncserver.sh
 sudo rm ./start-xwayland.sh
 sudo nano start-xwayland.sh
 sudo chmod 0755 start-xwayland.sh
+
+
+消除警告，可以给这些GID分配组名
+
+# 为1079 GID创建组名
+echo "aid_1079:x:1079:" >> /etc/group
+
+# 为99909997 GID创建组名
+echo "aid_app:x:99909997:" >> /etc/group
