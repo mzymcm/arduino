@@ -103,5 +103,6 @@ echo "aid_1079:x:1079:" >> /etc/group
 echo "aid_app:x:99909997:" >> /etc/group
 
 
-=====安装chrom浏览器
-sudo apt install chromium-browser
+=====安装midori浏览器 解决firefox浏览器使用问题
+sudo apt install midori
+midori
