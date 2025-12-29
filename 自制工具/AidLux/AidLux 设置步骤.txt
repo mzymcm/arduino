@@ -1,4 +1,5 @@
 aid-python3 -m pip install --upgrade pip
+sudo apt update && sudo apt upgrade
 ===点应用市场，点AidLux，安装Aid-Pkg，更新Terminal和Aid-Desktop
 ===点应用市场，点Ubuntu,搜索xfce4 安装
 ===点应用市场，点AidLux,安装Ubuntu Desktop
