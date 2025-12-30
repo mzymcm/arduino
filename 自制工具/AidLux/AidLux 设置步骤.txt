@@ -1,5 +1,6 @@
-aid-python3 -m pip install --upgrade pip
+sudo dpkg --configure -a --force-all
 sudo apt update && sudo apt upgrade
+sudo aid-python3 -m pip install --upgrade pip
 ===点应用市场，点AidLux，安装Aid-Pkg，更新Terminal和Aid-Desktop
 ===点应用市场，点Ubuntu,搜索xfce4 安装
 ===点应用市场，点AidLux,安装Ubuntu Desktop
@@ -106,3 +107,16 @@ echo "aid_app:x:99909997:" >> /etc/group
 =====安装midori浏览器 解决firefox浏览器使用问题
 sudo apt install midori
 midori
+
+
+===== 波特律动网站stm32学习
+https://www.baud-dance.com/
+
+===== 在线工具 串口助手 🔗
+https://serial.baud-dance.com/
+===== 在线工具 OLED取模助手 🔗
+https://led.baud-dance.com/
+===== 站长工具网站
+https://tool.chinaz.com/tools/nav
+===== SQL优化器
+https://ai.chinaz.com/encoder/sql-optimiser
