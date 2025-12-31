@@ -29,6 +29,320 @@ export XDG_CURRENT_DESKTOP=ubuntu:XFCE
 如果想再优化一下，将这个也改一下： tigervncserver -localhost no :2 改为下面的。
 sudo /usr/bin/tigervncserver :2 -geometry 1280x768 -localhost no
 
+
+
+
+
+========我这里给出一个更为好的方案，直接用我已改好的脚本  vncserver.sh
+
+
+
+==== vncserver.sh 文件内容  开始====
+
+
+#!/bin/bash
+
+APP_HOME="/opt/aidlux/app/ubuntu-desktop"
+PROCESS_NAME="Xtigervnc"
+USER_NAME="aidlux"
+USER_HOME="/home/$USER_NAME"
+cd "$USER_HOME"
+
+# 获取正确的 IP 地址（优先 wlan0）
+function get_ip() {
+    # 尝试获取 wlan0 IP
+    local wlan_ip=$(ip -4 addr show wlan0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+    
+    if [[ -n "$wlan_ip" ]]; then
+        echo "$wlan_ip"
+        return 0
+    fi
+    
+    # 尝试获取 eth0 IP
+    local eth_ip=$(ip -4 addr show eth0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+    
+    if [[ -n "$eth_ip" ]]; then
+        echo "$eth_ip"
+        return 0
+    fi
+    
+    # 获取第一个非本地 IP
+    local first_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    
+    if [[ -n "$first_ip" ]]; then
+        echo "$first_ip"
+        return 0
+    fi
+    
+    # 回退到 localhost
+    echo "127.0.0.1"
+}
+
+function start() {
+    local pid=$(ps -ef | grep -v grep | grep -v "${PROCESS_NAME}.sh" | grep -v tail | grep "${PROCESS_NAME}.*:2" | awk '{print $2}')
+    if [[ -n ${pid} ]]; then
+        echo "VNC 服务器已经在运行，进程 ID: ${pid}"
+        show_connection_info
+        exit 0
+    fi
+
+    # 清理锁文件
+    if [[ -e "/tmp/.X2-lock" ]]; then
+        rm -rf /tmp/.X2-lock
+    fi
+    if [[ -e "/tmp/.X11-unix/X2" ]]; then
+        rm -rf /tmp/.X11-unix/X2
+    fi
+
+    # 停止可能存在的 VNC 会话
+    sudo -u "$USER_NAME" vncserver -kill :2 2>/dev/null || true
+    
+    # 设置环境变量
+    export XKL_XMODMAP_DISABLE=1
+    export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg
+    export GNOME_SHELL_SESSION_MODE=ubuntu
+    export XDG_CURRENT_DESKTOP=XFCE
+    export XDG_SESSION_TYPE=x11
+    export DISPLAY=:2
+    
+    # 注意：Aidlux 可能没有 systemd，所以移除 systemctl 命令
+    # 尝试停止可能的显示管理器（不使用 systemctl）
+    pkill -f gdm 2>/dev/null || true
+    pkill -f lightdm 2>/dev/null || true
+    sleep 2
+
+    # 创建 xstartup 文件
+    create_xstartup
+    
+    # 以 aidlux 用户启动 VNC 服务器
+    echo "正在启动 VNC 服务器..."
+    sudo -u "$USER_NAME" /usr/bin/tigervncserver :2 -geometry 1280x768 -localhost no
+    
+    sleep 3
+
+    # 重新检查进程
+    pid=$(ps -ef | grep -v grep | grep -v "${PROCESS_NAME}.sh" | grep -v tail | grep "${PROCESS_NAME}.*:2" | awk '{print $2}')
+
+    if [[ -z "${pid}" ]]; then
+        # 等待进程启动
+        local count=0
+        while ((count < 10)); do
+            pid=$(ps -ef | grep -v grep | grep -v "${PROCESS_NAME}.sh" | grep -v tail | grep "${PROCESS_NAME}.*:2" | awk '{print $2}')
+            if [[ -n ${pid} ]]; then
+                echo "✅ VNC 服务器启动成功，进程 ID: ${pid}"
+                show_connection_info
+                break
+            fi
+            ((count++))
+            sleep 1
+        done
+        
+        if [[ -z "${pid}" ]]; then
+            echo "❌ VNC 服务器启动失败"
+            echo "请检查日志: tail -20 /home/${USER_NAME}/.vnc/localhost:2.log"
+            return 1
+        fi
+    else
+        echo "✅ VNC 服务器启动成功，进程 ID: ${pid}"
+        show_connection_info
+    fi
+}
+
+function create_xstartup() {
+    local xstartup="/home/${USER_NAME}/.vnc/xstartup"
+    
+    echo "创建 xstartup 文件..."
+    
+    sudo -u "$USER_NAME" cat > "$xstartup" << 'EOF'
+#!/bin/bash
+# XFCE 桌面环境配置
+
+# 清理环境变量
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+
+# 设置显示
+export DISPLAY=:2
+
+# 设置桌面环境变量
+export XDG_SESSION_TYPE=x11
+export XDG_CURRENT_DESKTOP=XFCE
+export XDG_SESSION_DESKTOP=xfce
+export XDG_CONFIG_DIRS=/etc/xdg/xdg-xfce:/etc/xdg
+export XDG_DATA_DIRS=/usr/share/xfce4:/usr/local/share:/usr/share
+
+# 启动 XFCE 会话
+if [ -x /usr/bin/xfce4-session ]; then
+    exec /usr/bin/xfce4-session
+else
+    # 备用方案：启动 xterm
+    xterm -geometry 80x24+10+10 -ls &
+    wait
+fi
+EOF
+    
+    sudo -u "$USER_NAME" chmod +x "$xstartup"
+    echo "xstartup 文件已创建"
+}
+
+function stop() {
+    echo "正在停止 VNC 服务器..."
+    
+    local count=0
+    local pid=$(ps -ef | grep -v grep | grep -v "${PROCESS_NAME}.sh" | grep -v tail | grep "${PROCESS_NAME}.*:2" | awk '{print $2}')
+    
+    if [[ -n ${pid} ]]; then
+        echo "找到 VNC 进程: ${pid}"
+        
+        # 先尝试正常停止 VNC 会话
+        sudo -u "$USER_NAME" vncserver -kill :2 2>/dev/null || true
+        
+        # 等待进程结束
+        while kill -0 ${pid} >/dev/null 2>&1; do
+            if ((count >= 10)); then
+                kill -9 ${pid} 2>/dev/null || true
+                echo "强制终止进程: ${pid}"
+                break
+            fi
+            ((count++))
+            sleep 1
+        done
+        
+        # 停止可能的桌面进程
+        sudo -u "$USER_NAME" pkill -f xfce4-session 2>/dev/null || true
+        sudo -u "$USER_NAME" pkill -f gnome-session 2>/dev/null || true
+        
+        # 注意：Aidlux 可能没有 systemd，所以移除 systemctl 命令
+        # 尝试启动可能的显示管理器
+        echo "尝试启动显示管理器..."
+    fi
+
+    # 清理锁文件
+    rm -f /tmp/.X2-lock 2>/dev/null
+    rm -f /tmp/.X11-unix/X2 2>/dev/null
+
+    echo "✅ VNC 服务器已停止"
+}
+
+function restart() {
+    echo "正在重启 VNC 服务器..."
+    stop
+    echo "等待资源释放..."
+    sleep 5
+    start
+}
+
+function status() {
+    local pid=$(ps -ef | grep -v grep | grep -v "${PROCESS_NAME}.sh" | grep -v tail | grep "${PROCESS_NAME}.*:2" | awk '{print $2}')
+    
+    if [[ -n "${pid}" ]]; then
+        echo "✅ VNC 服务器正在运行"
+        echo "进程 ID: ${pid}"
+        
+        # 检查端口
+        if ss -tuln 2>/dev/null | grep -q ":5902"; then
+            echo "端口状态: 5902 端口正在监听"
+        else
+            echo "端口状态: 5902 端口未监听（可能仍在启动中）"
+        fi
+        
+        show_connection_info
+        return 0
+    else
+        echo "❌ VNC 服务器未运行"
+        echo "使用 '$0 start' 启动 VNC 服务器"
+        return 1
+    fi
+}
+
+function show_connection_info() {
+    local ip=$(get_ip)
+    
+    echo ""
+    echo "═══════════════════════════════════════════════════"
+    echo "🖥️  VNC 服务器连接信息"
+    echo "═══════════════════════════════════════════════════"
+    echo ""
+    echo "📡 网络连接:"
+    echo "   本地连接:    localhost:2 或 127.0.0.1:5902"
+    echo "   远程连接:    ${ip}:5902"
+    echo ""
+    echo "🚀 连接命令:"
+    echo "   xtigervncviewer localhost:2"
+    echo "   或"
+    echo "   xtigervncviewer ${ip}:5902"
+    echo ""
+    echo "🔑 密码: 使用之前设置的 VNC 密码"
+    if [[ ! -f "/home/${USER_NAME}/.vnc/passwd" ]]; then
+        echo "⚠️  警告: 未设置 VNC 密码"
+        echo "   设置密码: sudo -u aidlux vncpasswd"
+    fi
+    echo ""
+    echo "📋 故障排除:"
+    echo "   查看日志: tail -20 /home/${USER_NAME}/.vnc/localhost:2.log"
+    echo "═══════════════════════════════════════════════════"
+}
+
+function main() {
+    local param=""
+    while (($# > 0)); do
+        param=$1
+        case ${param} in
+        "start")
+            start
+            exit $?
+            ;;
+        "restart")
+            restart
+            exit $?
+            ;;
+        "stop")
+            stop
+            exit $?
+            ;;
+        "status")
+            status
+            exit $?
+            ;;
+        "info")
+            show_connection_info
+            exit $?
+            ;;
+        *)
+            echo "用法: $0 <start|stop|restart|status|info>"
+            exit 1
+            ;;
+        esac
+    done
+}
+
+if (($# <= 0 || $# > 2)); then
+    echo "用法: $0 <start|stop|restart|status|info>"
+    echo ""
+    echo "命令说明:"
+    echo "  start    - 启动 VNC 服务器 (XFCE 桌面)"
+    echo "  stop     - 停止 VNC 服务器"
+    echo "  restart  - 重启 VNC 服务器"
+    echo "  status   - 查看 VNC 服务器状态"
+    echo "  info     - 显示连接信息"
+    exit 1
+fi
+
+main "$@"
+
+exit 0
+
+
+
+==== vncserver.sh 文件内容  结束====
+
+
+
+
+
+
+
+
 ===如果手机端的 xwayland 打不开 xfce4 ：打开 start-xwayland.sh 将下面的代码换上即可。
 sudo nano start-xwayland.sh
 ==== start-xwayland.sh 文件内容  开始====
@@ -107,6 +421,10 @@ echo "aid_app:x:99909997:" >> /etc/group
 =====安装midori浏览器 解决firefox浏览器使用问题
 sudo apt install midori
 midori
+
+=====清除命令窗口的命令缓存
+echo "" > ~/.bash_history
+
 
 
 ===== 波特律动网站stm32学习
