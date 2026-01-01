@@ -1,0 +1,52 @@
+# 编译程序
+chmod +x build.sh
+./build.sh
+
+# 设置权限
+sudo chmod +x virtual_serial
+
+# 查看帮助
+./virtual_serial -h
+
+# 启动虚拟串口
+./virtual_serial -p /tmp/vcom0 -s 192.168.1.55:8080
+
+# 使用调试模式
+./virtual_serial -p /tmp/myserial -s 127.0.0.1:8080 -v
+
+# 自定义波特率
+./virtual_serial -p /tmp/vcom0 -s localhost:9000 -b 9600
+
+
+测试虚拟串口
+# 在一个终端启动虚拟串口
+./virtual_serial -p /tmp/vcom0 -s 127.0.0.1:8080 -v
+
+# 在另一个终端启动TCP服务器
+nc -l 8080
+
+# 在第三个终端测试
+echo "Test data" > /tmp/vcom0
+cat /tmp/vcom0 &
+
+
+查看串口状态
+# 查看虚拟串口设备
+ls -la /tmp/vcom0
+
+# 查看串口设置
+stty -F /tmp/vcom0
+
+# 修改波特率
+stty -F /tmp/vcom0 9600
+
+
+
+
+
+权限问题：如果遇到权限错误，可以：
+
+# 修改权限
+sudo chmod 666 /tmp/vcom0
+# 或者使用root运行
+sudo ./virtual_serial -p /tmp/vcom0 -s localhost:8080
